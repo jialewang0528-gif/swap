@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Swap prototype</title>
+<meta name="description" content="Clickable prototype of Swap: a weekly coach for college students' food and getting-around spending.">
+<style>
+:root {
+  --ink: #1b1d29;
+  --muted: #5b5f70;
+  --line: #e9eaf0;
+  --ground: #f4f5f9;
+  --food: #f3c3a6;
+  --food-soft: #fdf1ea;
+  --food-ink: #8a4a26;
+  --move: #b6c3f4;
+  --move-soft: #eef1fd;
+  --move-ink: #3442a0;
+  --cap: #3f51c9;
+  --night: #d9d3f5;
+  --ios-blue: #007aff;
+  --sms-green: #34c759;
+  --bubble-gray: #e9e9eb;
+  --ios-gray: #8e8e93;
+  --kb: #d3d5db;
+  --key: #ffffff;
+  --key-dark: #abb0bc;
+  --sys: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font-family: var(--sys);
+  color: var(--ink);
+  background: var(--ground);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+::selection { background: var(--move); color: var(--ink); }
+:focus-visible { outline: 2px solid var(--cap); outline-offset: 2px; border-radius: 6px; }
+button { font: inherit; color: inherit; }
+
+/* ---------- Desktop shell ---------- */
+.shell {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) auto;
+  gap: 56px;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 40px 24px;
+}
+.intro h1 { font-size: 34px; letter-spacing: -0.025em; margin: 0 0 10px; line-height: 1.1; }
+.intro p { color: var(--muted); font-size: 16px; line-height: 1.5; margin: 0 0 24px; max-width: 34ch; }
+.tabs {
+  display: inline-grid; grid-template-columns: repeat(3, auto); gap: 2px;
+  background: #e3e5ec; border-radius: 10px; padding: 2px;
+}
+.tabs button {
+  border: 0; background: transparent; padding: 8px 16px; border-radius: 8px;
+  font-size: 14px; font-weight: 500; color: var(--muted); cursor: pointer;
+  transition: background .2s, color .2s, box-shadow .2s;
+}
+.tabs button:hover { color: var(--ink); }
+.tabs button[aria-selected="true"] { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(27,29,41,.12); }
+.note { margin-top: 20px; font-size: 14px; line-height: 1.5; color: var(--muted); max-width: 34ch; min-height: 6.5em; }
+.note strong { color: var(--ink); font-weight: 600; }
+.fine { margin-top: 28px; font-size: 12px; line-height: 1.5; color: var(--muted); max-width: 36ch; }
+
+/* ---------- Phone ---------- */
+.phone {
+  width: 390px; height: 844px; border-radius: 54px; background: #fff;
+  box-shadow: 0 0 0 11px #1c1c1e, 0 0 0 12px #3a3a3c, 0 30px 60px -12px rgba(27,29,41,.35);
+  position: relative; overflow: hidden;
+}
+.screen { position: absolute; inset: 0; display: none; flex-direction: column; background: #fff; }
+.screen.active { display: flex; }
+.status {
+  height: 54px; flex: none; display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 30px 0 36px; font-weight: 600; font-size: 17px; position: relative; z-index: 3;
+}
+.status svg { display: block; }
+.status .icons { display: flex; gap: 6px; align-items: center; }
+.island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 124px; height: 36px; border-radius: 20px; background: #000; z-index: 4; }
+.home-bar { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 136px; height: 5px; border-radius: 3px; background: #000; z-index: 5; }
+
+/* ---------- Web pages (setup, progress) ---------- */
+.page { flex: 1; overflow-y: auto; padding: 8px 22px 40px; scrollbar-width: none; }
+.page::-webkit-scrollbar { display: none; }
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; letter-spacing: -0.01em; margin: 6px 0 22px; }
+.brand svg { flex: none; }
+.page h2 { font-size: 26px; letter-spacing: -0.025em; line-height: 1.15; margin: 0 0 6px; text-wrap: balance; }
+.page h3 { font-size: 15px; margin: 30px 0 10px; letter-spacing: -0.01em; }
+.sub { color: var(--muted); font-size: 15px; line-height: 1.45; margin: 0 0 20px; }
+.rows { border-top: 1px solid var(--line); }
+.row { display: flex; justify-content: space-between; align-items: baseline; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 16px; gap: 12px; }
+.row .label { color: var(--ink); }
+.row .label small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+.row .num { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.row .num small { font-weight: 400; color: var(--muted); }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 8px; vertical-align: 1px; }
+.dot.food { background: var(--food); } .dot.move { background: var(--move); } .dot.night { background: var(--night); }
+.total-row .num { font-size: 18px; }
+
+.choice { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 14px; }
+.choice button {
+  border: 1.5px solid var(--line); background: #fff; border-radius: 12px; padding: 12px 0;
+  font-size: 16px; font-weight: 600; cursor: pointer; font-variant-numeric: tabular-nums;
+  transition: border-color .2s, background .2s;
+}
+.choice button:hover { border-color: var(--move); }
+.choice button[aria-pressed="true"] { border-color: var(--cap); background: var(--move-soft); color: var(--move-ink); }
+.callout { background: var(--move-soft); border-radius: 14px; padding: 14px 16px; font-size: 15px; line-height: 1.45; margin-top: 18px; }
+.callout.night { background: #f4f1fd; }
+.cta {
+  display: block; width: 100%; margin-top: 22px; border: 0; border-radius: 14px; padding: 15px;
+  background: var(--ink); color: #fff; font-size: 17px; font-weight: 600; cursor: pointer;
+  transition: transform .15s ease-out, background .2s;
+}
+.cta:hover { background: #2c2f40; }
+.cta:active { transform: scale(.98); }
+
+.chart { margin: 4px -4px 0; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); margin-top: 8px; }
+.legend span { display: inline-flex; align-items: center; }
+.legend .ln { width: 16px; height: 0; border-top: 2px solid var(--cap); margin-right: 6px; }
+.legend .ln.dash { border-top: 2px dashed #8a8fa3; }
+.gap-bar { height: 8px; border-radius: 4px; background: var(--food-soft); margin-top: 6px; position: relative; overflow: hidden; }
+.gap-bar i { position: absolute; inset: 0 auto 0 0; background: var(--food); border-radius: 4px; }
+.caveat { color: var(--muted); font-size: 13px; line-height: 1.45; margin-top: 8px; }
+.setting-row .num { font-weight: 500; color: var(--move-ink); }
+
+/* ---------- Messages ---------- */
+.nav {
+  flex: none; padding: 2px 16px 8px; display: grid; grid-template-columns: 70px 1fr 70px; align-items: start;
+  background: rgba(249,249,249,.94); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 0.5px solid rgba(60,60,67,.2); position: relative; z-index: 2;
+}
+.back { display: flex; align-items: center; gap: 2px; color: var(--ios-blue); font-size: 17px; padding-top: 10px; }
+.back .badge { background: var(--ios-blue); color: #fff; font-size: 13px; font-weight: 600; border-radius: 10px; padding: 1px 7px; }
+.contact { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.avatar { width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(180deg, #a6abb8, #868a96); color: #fff; display: grid; place-items: center; font-size: 22px; font-weight: 500; }
+.contact .name { font-size: 11px; color: #000; display: flex; align-items: center; gap: 2px; }
+.thread { flex: 1; overflow-y: auto; padding: 10px 0 12px; scrollbar-width: none; }
+.thread::-webkit-scrollbar { display: none; }
+.stamp { text-align: center; font-size: 11px; color: var(--ios-gray); margin: 14px 0 8px; }
+.stamp b { font-weight: 600; }
+.msg { display: flex; padding: 0 14px; margin: 2px 0; }
+.msg.out { justify-content: flex-end; }
+.msg.gap { margin-top: 8px; }
+.bubble {
+  max-width: 76%; padding: 7px 12px 8px; border-radius: 18px; font-size: 17px; line-height: 22px;
+  white-space: pre-line; position: relative; word-wrap: break-word; letter-spacing: -0.01em;
+}
+.in .bubble { background: var(--bubble-gray); color: #000; }
+.out .bubble { background: var(--sms-green); color: #fff; }
+.tail.in .bubble::before, .tail.out .bubble::before {
+  content: ""; position: absolute; bottom: 0; width: 20px; height: 20px;
+}
+.tail.in .bubble::before { left: -7px; background: var(--bubble-gray); border-bottom-right-radius: 16px 14px; }
+.tail.in .bubble::after { content: ""; position: absolute; bottom: 0; left: -26px; width: 26px; height: 20px; background: #fff; border-bottom-right-radius: 10px; }
+.tail.out .bubble::before { right: -7px; background: var(--sms-green); border-bottom-left-radius: 16px 14px; }
+.tail.out .bubble::after { content: ""; position: absolute; bottom: 0; right: -26px; width: 26px; height: 20px; background: #fff; border-bottom-left-radius: 10px; }
+.msg.enter .bubble { animation: pop .32s cubic-bezier(.16,1,.3,1); }
+@keyframes pop { from { transform: translateY(8px) scale(.96); opacity: .4; } to { transform: none; opacity: 1; } }
+.typing .bubble { display: flex; gap: 4px; padding: 12px 14px; }
+.typing i { width: 8px; height: 8px; border-radius: 50%; background: #9a9aa0; animation: blink 1.2s infinite; }
+.typing i:nth-child(2) { animation-delay: .2s; } .typing i:nth-child(3) { animation-delay: .4s; }
+@keyframes blink { 0%, 60%, 100% { opacity: .35; } 30% { opacity: 1; } }
+
+.composer { flex: none; display: flex; align-items: center; gap: 8px; padding: 6px 12px 8px; background: #fff; }
+.plus { width: 34px; height: 34px; border-radius: 50%; background: #e9e9eb; display: grid; place-items: center; flex: none; }
+.field {
+  flex: 1; min-height: 36px; border: 1px solid #c6c6c8; border-radius: 18px; padding: 7px 12px; font-size: 17px;
+  display: flex; align-items: center; justify-content: space-between; cursor: text; color: var(--ios-gray); background: #fff;
+}
+.field.has { color: #000; }
+.field .caret { display: inline-block; width: 2px; height: 20px; background: var(--ios-blue); margin-left: 1px; vertical-align: -4px; animation: caret 1s steps(1) infinite; }
+@keyframes caret { 50% { opacity: 0; } }
+.send { width: 28px; height: 28px; border-radius: 50%; border: 0; background: var(--sms-green); display: none; place-items: center; cursor: pointer; margin-right: -6px; flex: none; }
+.field.has .send { display: grid; }
+.mic { flex: none; }
+.field.has .mic { display: none; }
+
+.keyboard { flex: none; background: var(--kb); padding: 0 3px 34px; display: none; }
+.keyboard.open { display: block; }
+.quicktype { display: grid; grid-template-columns: 1fr 1fr 1fr; height: 44px; align-items: center; }
+.quicktype button { border: 0; background: transparent; font-size: 17px; height: 32px; cursor: pointer; position: relative; color: #000; border-radius: 6px; }
+.quicktype button:hover { background: rgba(255,255,255,.5); }
+.quicktype button + button::before { content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 1px; background: #b4b7bf; }
+.keys { display: grid; gap: 11px; }
+.krow { display: flex; justify-content: center; gap: 6px; }
+.key {
+  height: 42px; min-width: 0; flex: 0 0 calc((100% - 54px) / 10); border: 0; border-radius: 5px; background: var(--key);
+  box-shadow: 0 1px 0 #898a8d; font-size: 22px; font-weight: 400; cursor: pointer; padding: 0; color: #000;
+}
+.key:active { background: #e6e7ea; }
+.key.wide { flex: 0 0 42px; background: var(--key-dark); display: grid; place-items: center; }
+.key.space { flex: 1 1 auto; font-size: 16px; }
+.key.fn { flex: 0 0 88px; font-size: 16px; background: var(--key-dark); }
+.key.ret { flex: 0 0 88px; font-size: 16px; background: var(--key-dark); }
+
+/* ---------- Mobile: the page is the phone ---------- */
+@media (max-width: 760px) {
+  .shell { display: block; padding: 0; }
+  .intro { position: sticky; top: 0; z-index: 10; background: rgba(244,245,249,.94); backdrop-filter: blur(16px); padding: 12px 16px 10px; display: flex; flex-direction: column; align-items: stretch; }
+  .intro h1, .intro p, .note, .fine { display: none; }
+  .tabs { display: grid; width: 100%; }
+  .phone { width: 100%; height: calc(100svh - 60px); border-radius: 0; box-shadow: none; }
+  .island, .home-bar, .status { display: none; }
+  .nav { padding-top: 8px; }
+  .keyboard { padding-bottom: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="intro">
+    <h1>Swap</h1>
+    <p>A weekly coach for college students' food and getting-around spending. It makes the cheaper choice easier and never blocks apps.</p>
+    <div class="tabs" role="tablist" aria-label="Prototype screens">
+      <button role="tab" aria-selected="true" data-tab="setup">Setup</button>
+      <button role="tab" aria-selected="false" data-tab="texts">Texts</button>
+      <button role="tab" aria-selected="false" data-tab="progress">Progress</button>
+    </div>
+    <div class="note" id="note"></div>
+    <p class="fine">Prototype. Every number here is sample data.</p>
+  </div>
+
+  <div class="phone" id="phone">
+    <div class="island" aria-hidden="true"></div>
+
+    <!-- Setup -->
+    <section class="screen active" id="setup" aria-label="Setup">
+      <div class="status" data-status></div>
+      <div class="page">
+        <div class="brand" data-brand></div>
+        <h2>Your usual week</h2>
+        <p class="sub">From your last 6 weeks of card charges. Food and getting around only.</p>
+        <div class="rows">
+          <div class="row"><span class="label"><span class="dot food"></span>Food</span><span class="num">$460</span></div>
+          <div class="row"><span class="label"><span class="dot move"></span>Getting around</span><span class="num">$175</span></div>
+          <div class="row total-row"><span class="label">Total</span><span class="num">$635</span></div>
+          <div class="row"><span class="label">A 15-week semester at this pace</span><span class="num">$9,525</span></div>
+        </div>
+        <h3>Save each week</h3>
+        <div class="choice" role="group" aria-label="Weekly savings target">
+          <button aria-pressed="false" data-save="50">$50</button>
+          <button aria-pressed="true" data-save="100">$100</button>
+          <button aria-pressed="false" data-save="150">$150</button>
+        </div>
+        <div class="rows">
+          <div class="row"><span class="label">Weekly cap</span><span class="num" id="capOut">$535</span></div>
+          <div class="row"><span class="label">Saved by end of semester</span><span class="num" id="semOut">$1,500</span></div>
+        </div>
+        <div class="callout night">Night rides (11pm to 6am) count in your total. They are never a swap target.</div>
+        <button class="cta" id="start">Start Sunday recaps</button>
+      </div>
+      <div class="home-bar" aria-hidden="true"></div>
+    </section>
+
+    <!-- Texts -->
+    <section class="screen" id="texts" aria-label="Texts">
+      <div class="status" data-status></div>
+      <div class="nav">
+        <div class="back"><svg width="12" height="20" viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="badge">3</span></div>
+        <div class="contact"><div class="avatar">S</div><div class="name">Swap <svg width="6" height="10" viewBox="0 0 6 10" aria-hidden="true"><path d="m1 1 4 4-4 4" fill="none" stroke="#8e8e93" stroke-width="1.6" stroke-linecap="round"/></svg></div></div>
+        <div></div>
+      </div>
+      <div class="thread" id="thread" aria-live="polite"></div>
+      <div class="composer">
+        <div class="plus" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 1v12M1 7h12" stroke="#8e8e93" stroke-width="2" stroke-linecap="round"/></svg></div>
+        <div class="field" id="field" role="textbox" tabindex="0" aria-label="Reply">
+          <span id="fieldText">Text Message • SMS</span>
+          <svg class="mic" width="14" height="20" viewBox="0 0 14 20" aria-hidden="true"><rect x="4" y="1" width="6" height="11" rx="3" fill="none" stroke="#8e8e93" stroke-width="1.6"/><path d="M1 9a6 6 0 0 0 12 0M7 15v4" fill="none" stroke="#8e8e93" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <button class="send" id="send" aria-label="Send"><svg width="12" height="14" viewBox="0 0 12 14"><path d="M6 13V2M1.5 6.5 6 2l4.5 4.5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
+      </div>
+      <div class="keyboard" id="keyboard">
+        <div class="quicktype" id="quicktype"></div>
+        <div class="keys" id="keys"></div>
+      </div>
+      <div class="home-bar" aria-hidden="true"></div>
+    </section>
+
+    <!-- Progress -->
+    <section class="screen" id="progress" aria-label="Progress">
+      <div class="status" data-status></div>
+      <div class="page">
+        <div class="brand" data-brand></div>
+        <h2>Week of Oct 26</h2>
+        <p class="sub">Compared with your usual week, not anyone else's.</p>
+        <div class="rows">
+          <div class="row"><span class="label"><span class="dot food"></span>Food</span><span class="num">$366 <small>usual $460</small></span></div>
+          <div class="row"><span class="label"><span class="dot move"></span>Getting around</span><span class="num">$148 <small>usual $175</small></span></div>
+          <div class="row total-row"><span class="label">Total</span><span class="num">$514 <small>cap $525</small></span></div>
+        </div>
+
+        <h3>Last 8 weeks</h3>
+        <div class="chart" id="chart"></div>
+        <div class="legend">
+          <span><span class="dot food"></span>Food</span>
+          <span><span class="dot move"></span>Getting around</span>
+          <span><span class="ln"></span>Cap</span>
+          <span><span class="ln dash"></span>Usual $635</span>
+        </div>
+
+        <h3>Where it went</h3>
+        <div class="rows" id="tags"></div>
+        <p class="caveat">From your one-word replies. Night rides are listed but never a swap target.</p>
+
+        <h3>Same order, delivered vs. picked up</h3>
+        <div id="gaps"></div>
+        <p class="caveat">Your past orders, median ticket. Delivered orders may include more food.</p>
+
+        <h3>Swaps</h3>
+        <div class="rows">
+          <div class="row"><span class="label">Subway Tue and Thu mornings<small>Kept 2 of 3 weeks</small></span><span class="num">$35 <small>/wk est.</small></span></div>
+          <div class="row"><span class="label">Pickup instead of delivery<small>Used 3 times</small></span><span class="num">$16 <small>each est.</small></span></div>
+          <div class="row"><span class="label">Friend's swipe for lunch<small>Used 2 times</small></span><span class="num">$18 <small>each est.</small></span></div>
+        </div>
+
+        <h3>Payback</h3>
+        <div class="rows">
+          <div class="row"><span class="label">Above cap, week of Oct 12</span><span class="num">$40</span></div>
+          <div class="row"><span class="label">Payback<small>$10 a week, 2 of 4 weeks left</small></span><span class="num">$20 left</span></div>
+          <div class="row"><span class="label">Weeks at or under cap</span><span class="num">6 of 7</span></div>
+        </div>
+
+        <h3>Settings</h3>
+        <div class="rows">
+          <div class="row setting-row"><span class="label">Save each week</span><span class="num">$100</span></div>
+          <div class="row setting-row"><span class="label">Night window</span><span class="num">11pm to 6am</span></div>
+          <div class="row setting-row"><span class="label">Charges kept</span><span class="num">Food, getting around</span></div>
+          <div class="row setting-row"><span class="label">Recap</span><span class="num">Sundays, 6pm</span></div>
+        </div>
+      </div>
+      <div class="home-bar" aria-hidden="true"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+const NOTES = {
+  setup: "<strong>First real number.</strong> The semester total shows once, here, never in weekly texts. Pick a savings amount to set the cap.",
+  texts: "<strong>Sunday recap and daily tags.</strong> Tap the text field, then tap a suggestion or type a word. Try <strong>night</strong> on a ride, or <strong>skip</strong>.",
+  progress: "<strong>Private progress page.</strong> Own baseline only, a running count instead of a streak, and payback spread over 4 weeks."
+};
+
+// Status bar and brand mark, shared by every screen.
+const STATUS = `<span>9:41</span><span class="icons" aria-hidden="true">
+<svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1" fill="#000"/><rect x="5" y="5.5" width="3" height="6.5" rx="1" fill="#000"/><rect x="10" y="3" width="3" height="9" rx="1" fill="#000"/><rect x="15" y="0" width="3" height="12" rx="1" fill="#000"/></svg>
+<svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 2.6c2.3 0 4.4.9 6 2.4l1.1-1.2A10.2 10.2 0 0 0 8 1 10.2 10.2 0 0 0 .9 3.8L2 5c1.6-1.5 3.7-2.4 6-2.4Zm0 3.2c1.4 0 2.6.5 3.6 1.4l1.1-1.2A7 7 0 0 0 8 4.2 7 7 0 0 0 3.3 6l1.1 1.2c1-.9 2.2-1.4 3.6-1.4Zm0 3.2c-.6 0-1.1.2-1.5.6L8 11.2l1.5-1.6c-.4-.4-.9-.6-1.5-.6Z" fill="#000"/></svg>
+<svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.5" fill="none" stroke="#000" opacity=".35"/><rect x="2" y="2" width="20" height="9" rx="2" fill="#000"/><path d="M25 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2Z" fill="#000" opacity=".4"/></svg></span>`;
+const BRAND = `<svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><rect width="22" height="22" rx="6" fill="#1b1d29"/><path d="M6 8.5h8.5l-2.2-2.2M16 13.5H7.5l2.2 2.2" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Swap`;
+document.querySelectorAll("[data-status]").forEach(el => el.innerHTML = STATUS);
+document.querySelectorAll("[data-brand]").forEach(el => el.innerHTML = BRAND);
+
+// ---------- Tabs ----------
+const tabs = document.querySelectorAll(".tabs button");
+function show(id) {
+  tabs.forEach(t => t.setAttribute("aria-selected", String(t.dataset.tab === id)));
+  document.querySelectorAll(".screen").forEach(s => s.classList.toggle("active", s.id === id));
+  document.getElementById("note").innerHTML = NOTES[id];
+  if (id === "texts") startThread();
+}
+tabs.forEach(t => t.addEventListener("click", () => show(t.dataset.tab)));
+document.getElementById("note").innerHTML = NOTES.setup;
+
+// ---------- Setup ----------
+const USUAL = 635, WEEKS = 15;
+const money = n => "$" + n.toLocaleString("en-US");
+document.querySelectorAll("[data-save]").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll("[data-save]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  const save = Number(b.dataset.save);
+  document.getElementById("capOut").textContent = money(USUAL - save);
+  document.getElementById("semOut").textContent = money(save * WEEKS);
+}));
+document.getElementById("start").addEventListener("click", () => show("texts"));
+
+// ---------- Texts ----------
+const thread = document.getElementById("thread");
+const RECAP = "Week of Oct 26\nFood: $366 (usual $460)\nGetting around: $148 (usual $175)\nTotal: $514. Cap: $525.\nMost rides: weekday mornings (6)\nNext week: subway Tue and Thu mornings. About $35.\nReply 1 to keep, 2 for a different swap.";
+const CHARGES = [
+  { text: "Uber $18. Food or ride?\nTag: food, class, late, out, night, skip", tags: ["food", "class", "late", "out", "night", "skip"], quick: ["food", "class", "night"], merchant: "Uber" },
+  { text: "DoorDash $34.\nTag: tired, late, friends, treat, skip", tags: ["tired", "late", "friends", "treat", "skip"], quick: ["tired", "friends", "skip"], merchant: "DoorDash" },
+  { text: "Lyft $22.\nTag: class, late, out, night, errand, skip", tags: ["class", "late", "out", "night", "errand", "skip"], quick: ["class", "out", "night"], merchant: "Lyft" }
+];
+let stage = "recap", chargeIndex = 0, started = false, draft = "";
+
+function stamp(html) { const d = document.createElement("div"); d.className = "stamp"; d.innerHTML = html; thread.appendChild(d); }
+function bubble(text, side, opts = {}) {
+  const last = thread.lastElementChild;
+  if (last && last.classList.contains("msg") && last.classList.contains(side)) last.classList.remove("tail");
+  const m = document.createElement("div");
+  m.className = `msg ${side} tail` + (opts.enter ? " enter" : "") + (opts.gap ? " gap" : "");
+  const b = document.createElement("div"); b.className = "bubble"; b.textContent = text;
+  m.appendChild(b); thread.appendChild(m); thread.scrollTop = thread.scrollHeight;
+}
+function typing(then) {
+  const t = document.createElement("div"); t.className = "msg in typing gap";
+  t.innerHTML = '<div class="bubble"><i></i><i></i><i></i></div>';
+  thread.appendChild(t); thread.scrollTop = thread.scrollHeight;
+  setTimeout(() => { t.remove(); then(); }, 700);
+}
+function startThread() {
+  if (started) return; started = true;
+  stamp("<b>Sunday</b> 6:00 PM");
+  bubble(RECAP, "in");
+  setQuick(["1", "2", "Thanks"]);
+}
+function nextCharge() {
+  if (chargeIndex >= CHARGES.length) { stage = "done"; setQuick(["Thanks", "OK", "Got it"]); return; }
+  bubble(CHARGES[chargeIndex].text, "in", { enter: true, gap: chargeIndex > 0 });
+  setQuick(CHARGES[chargeIndex].quick);
+}
+function reply(raw) {
+  const word = raw.trim().toLowerCase();
+  if (!word) return;
+  bubble(raw.trim(), "out", { enter: true, gap: true });
+  setDraft("");
+  if (stage === "recap") {
+    if (word === "1") {
+      typing(() => {
+        bubble("Kept. Subway Tue and Thu mornings.", "in", { enter: true, gap: true });
+        setTimeout(() => {
+          stamp("<b>Monday</b> 12:00 PM");
+          bubble("Yesterday: 3 charges", "in", { enter: true });
+          stage = "tags"; chargeIndex = 0; nextCharge();
+        }, 900);
+      });
+    } else if (word === "2") {
+      typing(() => bubble("Other swap: pickup instead of delivery on weeknights. About $30.\nReply 1 to keep.", "in", { enter: true, gap: true }));
+      setQuick(["1", "Thanks", "OK"]);
+    } else {
+      typing(() => bubble("Reply 1 to keep, 2 for a different swap.", "in", { enter: true, gap: true }));
+    }
+    return;
+  }
+  if (stage === "tags") {
+    const c = CHARGES[chargeIndex];
+    if (word === "skip") { chargeIndex++; setTimeout(nextCharge, 500); return; } // skip gets no reply
+    if (!c.tags.includes(word)) {
+      typing(() => bubble("Tag: " + c.tags.join(", "), "in", { enter: true, gap: true }));
+      return;
+    }
+    let ack = "Saved.";
+    if (word === "night") ack = "Saved as night ride.";
+    else if (c.merchant === "Uber" && word === "food") ack = "Saved as food.";
+    chargeIndex++;
+    typing(() => { bubble(ack, "in", { enter: true, gap: true }); setTimeout(nextCharge, 600); });
+    return;
+  }
+}
+
+// Composer, keyboard and QuickType
+const field = document.getElementById("field"), fieldText = document.getElementById("fieldText");
+const keyboard = document.getElementById("keyboard"), quick = document.getElementById("quicktype");
+function setDraft(v) {
+  draft = v;
+  field.classList.toggle("has", draft.length > 0);
+  fieldText.innerHTML = draft.length ? escapeHtml(draft) + '<span class="caret"></span>' : (keyboard.classList.contains("open") ? '<span class="caret"></span>' : "Text Message • SMS");
+}
+function escapeHtml(s) { return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function setQuick(words) {
+  quick.innerHTML = "";
+  words.slice(0, 3).forEach(w => {
+    const b = document.createElement("button"); b.textContent = w;
+    b.addEventListener("click", () => reply(w));
+    quick.appendChild(b);
+  });
+}
+function openKeyboard() { keyboard.classList.add("open"); setDraft(draft); thread.scrollTop = thread.scrollHeight; }
+field.addEventListener("click", e => { if (!e.target.closest("#send")) openKeyboard(); });
+field.addEventListener("keydown", e => {
+  if (e.key === "Enter") { e.preventDefault(); reply(draft); }
+  else if (e.key === "Backspace") setDraft(draft.slice(0, -1));
+  else if (e.key.length === 1) { openKeyboard(); setDraft(draft + e.key); }
+});
+document.getElementById("send").addEventListener("click", e => { e.stopPropagation(); reply(draft); });
+
+const ROWS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
+const keys = document.getElementById("keys");
+ROWS.forEach((row, i) => {
+  const r = document.createElement("div"); r.className = "krow";
+  if (i === 2) r.appendChild(fnKey('<svg width="18" height="16" viewBox="0 0 18 16"><path d="M9 1 1.5 8.5H5.5V15h7V8.5h4Z" fill="none" stroke="#000" stroke-width="1.5" stroke-linejoin="round"/></svg>', "Shift", () => {}));
+  [...row].forEach(ch => {
+    const k = document.createElement("button"); k.className = "key"; k.textContent = ch;
+    k.addEventListener("click", () => setDraft(draft + ch)); r.appendChild(k);
+  });
+  if (i === 2) r.appendChild(fnKey('<svg width="22" height="16" viewBox="0 0 22 16"><path d="M7 1h13a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H7L1 8Z" fill="none" stroke="#000" stroke-width="1.5" stroke-linejoin="round"/><path d="m10 5 6 6m0-6-6 6" stroke="#000" stroke-width="1.5" stroke-linecap="round"/></svg>', "Delete", () => setDraft(draft.slice(0, -1))));
+  keys.appendChild(r);
+});
+const bottom = document.createElement("div"); bottom.className = "krow";
+const nums = document.createElement("button"); nums.className = "key fn"; nums.textContent = "123"; nums.addEventListener("click", () => setDraft(draft + (draft.endsWith("1") ? "" : "1")));
+const space = document.createElement("button"); space.className = "key space"; space.textContent = "space"; space.addEventListener("click", () => setDraft(draft + " "));
+const ret = document.createElement("button"); ret.className = "key ret"; ret.textContent = "return"; ret.addEventListener("click", () => reply(draft));
+bottom.append(nums, space, ret); keys.appendChild(bottom);
+function fnKey(svg, label, fn) { const k = document.createElement("button"); k.className = "key wide"; k.innerHTML = svg; k.setAttribute("aria-label", label); k.addEventListener("click", fn); return k; }
+
+// ---------- Progress: chart, tags, price gaps ----------
+const WEEKS_DATA = [
+  { wk: "9/7", food: 470, move: 210, cap: null },
+  { wk: "9/14", food: 400, move: 138, cap: 535 },
+  { wk: "9/21", food: 392, move: 140, cap: 535 },
+  { wk: "9/28", food: 415, move: 120, cap: 535 },
+  { wk: "10/5", food: 380, move: 150, cap: 535 },
+  { wk: "10/12", food: 430, move: 152, cap: 535 },
+  { wk: "10/19", food: 360, move: 150, cap: 525 },
+  { wk: "10/26", food: 366, move: 148, cap: 525 }
+];
+(function chart() {
+  const W = 346, H = 168, top = 10, bottomPad = 22, left = 4, max = 720;
+  const bw = 26, step = (W - left * 2) / WEEKS_DATA.length;
+  const y = v => top + (H - top - bottomPad) * (1 - v / max);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Weekly food and getting-around spending for 8 weeks, against cap and usual">`;
+  WEEKS_DATA.forEach((d, i) => {
+    const x = left + i * step + (step - bw) / 2, total = d.food + d.move;
+    // One rounded shape per week, split into food (bottom) and getting around (top).
+    s += `<clipPath id="bar${i}"><rect x="${x}" y="${y(total)}" width="${bw}" height="${y(0) - y(total)}" rx="5"/></clipPath>`;
+    s += `<g clip-path="url(#bar${i})"><rect x="${x}" y="${y(total)}" width="${bw}" height="${y(d.food) - y(total)}" fill="var(--move)"/>`;
+    s += `<rect x="${x}" y="${y(d.food)}" width="${bw}" height="${y(0) - y(d.food)}" fill="var(--food)"/></g>`;
+    s += `<text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle" font-size="11" fill="#5b5f70" font-family="var(--sys)">${d.wk}</text>`;
+  });
+  s += `<line x1="0" x2="${W}" y1="${y(635)}" y2="${y(635)}" stroke="#8a8fa3" stroke-width="1.5" stroke-dasharray="4 4"/>`;
+  let path = "";
+  WEEKS_DATA.forEach((d, i) => {
+    if (!d.cap) return;
+    const x0 = left + i * step + 2, x1 = left + (i + 1) * step - 2;
+    path += `M${x0} ${y(d.cap)}H${x1}`;
+  });
+  s += `<path d="${path}" stroke="var(--cap)" stroke-width="2" stroke-linecap="round"/>`;
+  s += `</svg>`;
+  document.getElementById("chart").innerHTML = s;
+})();
+
+const TAGS = [
+  ["food", "Friends", 142], ["food", "Tired", 96], ["food", "Planned", 90], ["food", "Treat", 38],
+  ["move", "Class", 52], ["move", "Late", 31], ["night", "Night (protected)", 31], ["move", "Out", 20], ["move", "Subway", 14]
+];
+document.getElementById("tags").innerHTML = TAGS.map(([k, label, n]) =>
+  `<div class="row"><span class="label"><span class="dot ${k}"></span>${label}</span><span class="num">$${n}</span></div>`).join("");
+
+const GAPS = [["Shake Shack", 15, 26], ["Domino's", 13, 24], ["Thai place", 17, 29]];
+document.getElementById("gaps").innerHTML = '<div class="rows">' + GAPS.map(([name, pick, del]) =>
+  `<div class="row" style="display:block"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px"><span class="label">${name}</span><span class="num">$${pick} <small>picked up</small> · $${del} <small>delivered</small></span></div>
+   <div class="gap-bar" aria-hidden="true"><i style="width:${Math.round(pick / del * 100)}%"></i></div></div>`).join("") + "</div>";
+</script>
+</body>
+</html>
