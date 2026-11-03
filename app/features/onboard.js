@@ -2,9 +2,9 @@
    without closing it). Opens on first launch while the global store key "onboarded" is unset, and
    from "Set up again" (You sheet) or the desktop panel via Swap open("onboard").
    Steps: welcome + whose data -> findings computed from the active profile -> weekly save target
-   (api.setSave, live cap from api.capOf) -> kitchen, meal plan, subway, late nights (api.questions,
+   (api.setSave, the weekly budget from api.budget: the same number as the Today card) -> kitchen, meal plan, subway, late nights (api.questions,
    store "moveProfile", shared with Move-in and the You sheet) -> reminders (api.notify; iPhone app
-   only, the step is left out on the web) -> done (the cap after commit + one swap from api.swaps()).
+   only, the step is left out on the web) -> done (the budget after commit + one swap from api.swaps()).
    Chrome: Back top-left, Close X top-right on every step. "Skip this question" sits under each question.
    One signature motion: the findings stack in. Everything else is a quiet fade under 250ms. */
 (function () {
@@ -28,10 +28,16 @@
       <div class="ob-fhead"><div class="ob-ftext"><span class="t-sub t-2">${label}</span><span class="n-m">${value}</span></div>${mark ? `<div class="ob-marks">${mark}</div>` : ""}</div>
       ${foot ? `<p class="t-foot t-2 ob-foot">${foot}</p>` : ""}${extra}</div>`;
 
-    const u = D.usual;
-    out.push(card("Usual week", money(u.total), "", "6-week average", `
-      <div class="ob-split" aria-hidden="true"><i class="fill-food" style="flex:${u.food}"></i><i class="fill-move" style="flex:${u.move}"></i></div>
-      <div class="ob-legend t-foot t-2"><span><i class="dot food"></i>Food <b class="num">${money(u.food)}</b></span><span><i class="dot move"></i>Getting around <b class="num">${money(u.move)}</b></span></div>`));
+    const u = D.usual, B = typeof api.budget === "function" ? api.budget() : null;
+    if (B && B.scope === "all") {
+      // Live build: all his money out, the same usual week the budget is built on.
+      out.push(card("Usual week", money(B.usual), "", B.flex ? "Last 10 weeks, all spending except bills" : "All money out, not investing",
+        B.fixedUsual ? `<div class="ob-legend t-foot t-2"><span>Bills, apart <b class="num">${money(B.fixedUsual)}</b> a week</span></div>` : ""));
+    } else {
+      out.push(card("Usual week", money(u.total), "", "Food and getting around, last 6 weeks", `
+        <div class="ob-split" aria-hidden="true"><i class="fill-food" style="flex:${u.food}"></i><i class="fill-move" style="flex:${u.move}"></i></div>
+        <div class="ob-legend t-foot t-2"><span><i class="dot food"></i>Food <b class="num">${money(u.food)}</b></span><span><i class="dot move"></i>Getting around <b class="num">${money(u.move)}</b></span></div>`));
+    }
 
     const gap = (D.priceGaps || []).slice().sort((a, b) => (b.delivered - b.pickup) - (a.delivered - a.pickup))[0];
     if (gap && gap.delivered > gap.pickup) {
@@ -165,8 +171,8 @@
         node.classList.add("ob-welcome");
         node.innerHTML = `<div class="ob-hero">
             <img class="ob-icon" src="icons/icon.svg" width="84" height="84" alt="">
-            <h2 class="t-title">Where your food and ride money goes</h2>
-            <p class="t-body t-2">Save without cutting either.</p>
+            <h2 class="t-title">Where your money goes</h2>
+            <p class="t-body t-2">${api.data.live ? "From your bank." : "From your card."} Save ${money(api.data.thisWeek.saveTarget)} a week.</p>
           </div>
           <div class="ob-who"><span class="t-foot t-2" id="ob-who-l">Whose data</span>
             <div class="ob-seg" role="radiogroup" aria-labelledby="ob-who-l">${api.profiles().map(p =>
@@ -178,8 +184,9 @@
 
       findings(node) {
         const D = api.data, cards = findings(api), real = D.source === "real";
-        node.innerHTML = `<div class="ob-head"><h2 class="t-title">${pos()}${real ? "Your last" : "Last"} ${span(D.weekly)}</h2>
-          <p class="t-sub t-2">${real ? "From your card." : "A sample student."} ${api.badge()}</p></div>
+        // One source and one window per screen: the header says where the numbers come from.
+        node.innerHTML = `<div class="ob-head"><h2 class="t-title">${pos()}${real ? "Your spending" : "A sample student"}</h2>
+          <p class="t-sub t-2">${D.live ? "From your bank." : real ? `From your card, last ${span(D.weekly)}.` : `Last ${span(D.weekly)}.`} ${api.badge()}</p></div>
           <div class="ob-finds">${cards.join("")}</div>`;
         const items = [...node.querySelectorAll(".ob-find")];
         items.forEach(c => c.classList.add("pending"));
@@ -213,7 +220,7 @@
             <button class="icon-btn ob-step-btn" data-d="5" aria-label="Save $5 more">${icon("plus", 22, 2.2)}</button>
           </div>
           <div class="card ob-cap">
-            <div class="ob-cap-h"><span class="t-sub t-2">Weekly cap: usual minus savings</span>${api.badge("usual")}</div>
+            <div class="ob-cap-h"><span class="t-sub t-2">Weekly budget: usual week minus savings</span>${api.badge("usual")}</div>
             <span class="n-l"></span>
             <span class="t-foot t-2 ob-formula"></span>
           </div>
@@ -231,7 +238,7 @@
             animate(capEl, [{ scale: .94, opacity: .6 }, { scale: 1, opacity: 1 }], { preset: "snappy" });
             // One status line per change, never two bare numbers.
             clearTimeout(statusTimer);
-            statusTimer = setTimeout(() => { status.textContent = `Saving ${money(save)} a week. Cap ${money(api.capOf(save))}.`; }, 250);
+            statusTimer = setTimeout(() => { status.textContent = `Saving ${money(save)} a week. Budget ${money(api.capOf(save))}.`; }, 250);
           }
         };
         radios(node.querySelector(".ob-amts"), v => {
@@ -248,10 +255,11 @@
 
       remind(node) {
         const on = api.notify.state() || { sunday: true, daily: false };
-        const rows = [
-          ["sunday", "Sunday 6 PM recap", "Week total and cap", "week"],
-          ["daily", "Noon tag reminder", "Tag why you bought it", "receipt"]
-        ];
+        // Same rows as the You sheet (core REMINDERS): Sunday 6 PM plan, 8:30 AM today's number.
+        const rows = (api.reminders || [
+          { k: "sunday", title: "Plan next week", sub: "Sunday 6 PM", icon: "week" },
+          { k: "daily", title: "Morning number", sub: "8:30 AM, what you can spend today", icon: "receipt" }
+        ]).map(r => [r.k, r.title, r.sub, r.icon]);
         node.innerHTML = `<div class="ob-head"><h2 class="t-title">${pos()}Reminders</h2><p class="t-sub t-2">Change these any time under You.</p></div>
           <div class="card ob-rem">${rows.map(r => `<button class="switch-row" role="switch" data-k="${r[0]}" aria-checked="${!!on[r[0]]}"><span class="well" aria-hidden="true">${icon(r[3], 20)}</span><span class="grow"><b class="t-headline">${r[1]}</b><span class="t-foot t-2">${r[2]}</span></span><span class="switch" aria-hidden="true"></span></button>`).join("")}</div>`;
         node.querySelectorAll(".switch-row").forEach(b => b.addEventListener("click", () => {
@@ -261,13 +269,13 @@
       },
 
       done(node) {
-        // The cap after commit: the same number the Week tab shows.
-        const t = api.data.thisWeek;
+        // The budget after commit: the same number the Today card shows.
+        const t = api.data.thisWeek, budget = api.capOf(t.saveTarget);
         const list = api.swaps(), pick = list.find(s => s.id === store.get("deckPick")) || list[0];
         const markFor = s => s.rideApp ? api.brandMark(api.data.rideAppName || "Lower-fare app", "ride", 44)
           : api.logo(s.title) ? api.brandMark(s.title, s.kind, 44)
           : /subway/i.test(s.title) ? api.brandMark("MTA", "move", 44) : api.brandMark("", s.kind === "move" ? "ride" : "food", 44);
-        node.innerHTML = `<h2 class="ob-done-h"><span class="t-title3">Your cap</span><span class="ob-capline"><span class="n-xl">${money(t.cap)}</span><span class="t-title3 t-2">a week</span></span></h2>
+        node.innerHTML = `<h2 class="ob-done-h"><span class="t-title3">Your budget</span><span class="ob-capline"><span class="n-xl">${money(budget)}</span><span class="t-title3 t-2">a week</span></span></h2>
           <p class="t-foot t-2 ob-foot">${esc(api.capLine(t.saveTarget))} ${api.badge("usual")}</p>
           ${pick ? `<div class="ob-try"><h3 class="t-headline">One swap to try ${api.badge("swaps") !== api.badge("usual") ? api.badge("swaps") : ""}</h3>
             <div class="card ob-swap">${markFor(pick)}<div class="grow"><b class="t-headline">${esc(pick.title)}</b><span class="t-sub t-2">${esc(pick.detail)}</span></div>
@@ -342,7 +350,7 @@
   Swap.feature({
     id: "onboard",
     title: "First-run setup",
-    pitch: "Whose data, what it shows, a weekly cap.",
+    pitch: "Whose data, what it shows, a weekly budget.",
     boot(api) { if (!api.store.get("onboarded")) run(api, { first: true }); },
     open(api) { run(api); }
   });

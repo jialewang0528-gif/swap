@@ -1,7 +1,7 @@
 /* By day: 7-day strip with a glass lens (a floating control), day list, time-of-day lanes. Tokens only. */
 .sc > .section-title:first-child { margin-top: var(--s-6); }
 .sc .section-title { align-items: center; }
-.sc-card { padding: var(--s-4) var(--s-3) var(--s-2); }
+.sc-card { padding: var(--s-4) var(--s-3) var(--s-2); container-type: inline-size; }
 
 .sc-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: var(--s-3); padding: 0 var(--s-1) var(--s-3); }
 .sc-total { margin-top: 2px; }
@@ -35,18 +35,14 @@
 
 /* Day list */
 .sc-list { list-style: none; margin: var(--s-2) 0 0; padding: 0; box-shadow: 0 -.5px 0 var(--hair); }
-.sc-row { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; column-gap: var(--s-3); align-items: center; padding: var(--s-2) var(--s-1); min-height: var(--tap); }
+.sc-row { padding: var(--s-2) var(--s-1); min-height: var(--tap); }
 .sc-nocharges { display: block; }
 .sc-row + .sc-row { box-shadow: 0 -.5px 0 var(--hair); }
-.sc-main { min-width: 0; }
-.sc-main > b { display: block; font-weight: 600; overflow-wrap: anywhere; }
-.sc-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); margin-top: 2px; color: var(--ink-2); }
-.sc-meta:empty { display: none; }
-.sc-row .amt { font-weight: 600; }
 
 .sc-chip { position: relative; display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 9px; border-radius: var(--r-pill); font-weight: 600; background: var(--fill); color: var(--ink-2); white-space: nowrap; }
-button.sc-chip::after { content: ""; position: absolute; inset: -10px -6px; }   /* 44px tap target */
-.sc-chip.add { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ink-4); }
+button.sc-chip::after { content: ""; position: absolute; inset: -12px -8px; min-height: var(--tap); }   /* 44px tap target */
+/* Untagged: a quiet text button, not a pill on every row. */
+.sc-chip.add { height: auto; padding: 0; background: transparent; color: var(--ink-2); text-decoration: underline; text-decoration-color: var(--ink-4); text-underline-offset: 3px; }
 .sc-chip.set { background: var(--fill-2); color: var(--ink); }
 .sc-chip.prot { background: var(--night-soft); color: var(--night-ink); }
 .sc-pick { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--s-2); padding: var(--s-3) 0 2px 44px; }
@@ -54,8 +50,9 @@ button.sc-chip::after { content: ""; position: absolute; inset: -10px -6px; }   
 .sc-protect[hidden] { display: none; }
 .sc-protect svg { flex: none; margin-top: 2px; color: var(--night-ink); }
 
-/* Time of day */
-.sc-time { padding: var(--s-4); }
+/* Time of day: folded into the By day card (.bk-more disclosure from bank.css). */
+.sc-time { margin: var(--s-2) 0 var(--s-1); }
+.sc-time-body { padding: 0 var(--s-3) var(--s-3); }
 .sc-time-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-2); }
 .sc-lane { position: relative; height: 66px; margin-top: var(--s-3); border-radius: var(--r-well); background: var(--fill); }
 .sc-band { position: absolute; top: 0; bottom: 0; background: var(--night-soft); }
@@ -73,7 +70,7 @@ button.sc-chip::after { content: ""; position: absolute; inset: -10px -6px; }   
 .sc-mk.l b { translate: -8px 0; }
 .sc-mk.r b { translate: calc(-100% + 8px) 0; }
 .sc-marks > .sc-empty { position: absolute; left: 50%; top: 18px; translate: -50% 0; white-space: nowrap; padding: 2px var(--s-2); border-radius: var(--r-pill); background: var(--surface); }
-.sc-axis { position: relative; height: 14px; margin: 6px 2px 0; font-variant-numeric: tabular-nums; font-weight: 500; }
+.sc-axis { position: relative; height: 1.3em; margin: 6px 2px 0; font-variant-numeric: tabular-nums; font-weight: 500; }
 .sc-axis span { position: absolute; top: 0; translate: -50% 0; white-space: nowrap; }
 .sc-axis span:first-child { translate: 0 0; }
 .sc-axis span:last-child { translate: -100% 0; }
@@ -86,11 +83,24 @@ button.sc-chip::after { content: ""; position: absolute; inset: -10px -6px; }   
 
 /* Brand marks: same 32px footprint as the category wells. */
 .sc-row .brandmark { --bm: 32px; }
+.sc-col .d1 { display: none; }
 
 /* Everything else on the bank (founder's build): neutral, no tags. */
 .fill-other, .dot.other { background: var(--ink-4); }
 .sc-mk.g-other i { background: var(--ink-4); }
-.sc-mono { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--r-well);
-  background: var(--fill-2); color: var(--ink-2); font-family: var(--round); font-weight: 700; font-size: .882rem; }
-.sc-mono.in { background: var(--accent-soft); color: var(--accent-ink); }
-.sc-in { color: var(--accent-ink); }
+
+/* Narrow card (small phone or large text): one-letter days and no per-day amounts in the strip.
+   The selected day's amount stays in the header, and every day's amount is in the slider's value. */
+@container (max-width: 15rem) {
+  .sc-col .d3, .sc-col .num { display: none; }
+  .sc-col .d1 { display: inline; }
+  .sc-day { text-align: left; }
+}
+/* Time-of-day labels crowd at large text: keep the dots, the list below has every time and amount. */
+@container (max-width: 19rem) {
+  .sc-mk b { display: none; }
+  .sc-axis span:nth-child(2), .sc-axis span:nth-child(4) { display: none; }
+}
+.sc-morerow { list-style: none; box-shadow: 0 -.5px 0 var(--hair); }
+.sc-more { min-height: var(--tap); }
+.sc-row:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; border-radius: var(--r-well); }

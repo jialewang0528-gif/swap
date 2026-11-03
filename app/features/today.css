@@ -1,10 +1,13 @@
 /* Daily plan: today's room, the week so far, plan vs spent per day. Tokens only. */
-.td { display: grid; gap: var(--s-3); }
-.td-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--s-3); }
+.td { display: grid; gap: var(--s-3); container-type: inline-size; }
+/* Two columns while they fit; at large text they stack (left-aligned) instead of overlapping. */
+.td-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); align-items: end; gap: var(--s-3); }
 .td-top > div { display: grid; gap: 2px; min-width: 0; }
-.td-big { font-size: 2.353rem; font-weight: 700; line-height: 1.05; letter-spacing: -.01em; color: var(--accent-ink); }
+.td-big { font-size: min(2.353rem, 13vw); font-weight: 700; line-height: 1.05; letter-spacing: -.01em; color: var(--accent-ink); overflow-wrap: anywhere; }
 .td-big.over { color: var(--food-ink); }
 .td-week { text-align: right; }
+@container (max-width: 18.8rem) { .td-week { text-align: left; } }
+.td-today .td-meter { margin-top: var(--s-1); }
 .td-week b { font-size: 1.059rem; font-weight: 700; }
 .td-bad { color: var(--food-ink); }
 
@@ -12,27 +15,52 @@
 .td-meter i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
 .td-meter.over i { background: var(--food); }
 
+/* Day strip: each bar's height is that day's plan (outline), its fill is what was spent. */
 .td-strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; padding-top: var(--s-1); }
-.td-day { display: grid; justify-items: center; gap: 6px; min-width: 0; }
-.td-cap { position: relative; width: 12px; height: 64px; border-radius: var(--r-pill); background: var(--fill-2); overflow: hidden; }
+.td-day { display: grid; justify-items: center; align-content: start; gap: 6px; min-width: 0; }
+.td-bar { display: flex; align-items: flex-end; justify-content: center; height: 64px; }
+.td-cap { position: relative; width: 14px; border-radius: var(--r-pill); background: transparent; box-shadow: inset 0 0 0 1.5px var(--ink-4); overflow: hidden; }
 .td-cap i { position: absolute; left: 0; right: 0; bottom: 0; border-radius: inherit; background: var(--accent); }
-.td-day.over .td-cap i { background: var(--food); }
+.td-day.over .td-cap i { background: var(--food); box-shadow: inset 0 3px 0 var(--food-ink); }
+.td-day.stale .td-cap { box-shadow: none; background: repeating-linear-gradient(135deg, var(--fill-2) 0 3px, transparent 3px 6px); }
 .td-day b { color: var(--ink-3); font-weight: 600; }
 .td-day.on b { color: var(--ink); }
-.td-day.on .td-cap { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--ink); }
-.td-amt { color: var(--ink-3); font-weight: 500; white-space: nowrap; }
+.td-day.on .td-cap { outline: 2px solid var(--ink); outline-offset: 2px; }
+.td-amt { color: var(--ink-3); font-weight: 500; white-space: nowrap; font-size: min(.647rem, 3vw); }
 .td-day.past .td-amt, .td-day.on .td-amt { color: var(--ink); font-weight: 600; }
+.td-day.stale .td-amt { color: var(--ink-3); }
+.td-plus { color: var(--food-ink); font-weight: 600; white-space: nowrap; margin-top: -4px; font-size: min(.647rem, 3vw); }
+.td-dow1 { display: none; }
+/* Narrow card or large text: one-letter days, no amounts (the day list below has them). */
+@container (max-width: 15rem) {
+  .td-dow { display: none; }
+  .td-dow1 { display: inline; }
+  .td-amt, .td-plus { display: none; }
+}
 
 .td-legend { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--s-1) var(--s-3); margin: 0; }
 .td-status { color: var(--ink-2); font-weight: 600; }
+.td-over { color: var(--food-ink); }
+.td-under { color: var(--accent-ink); }
+.td-bills { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-3); padding: var(--s-2) 0 0; box-shadow: 0 -.5px 0 var(--hair); }
+.td-bills b { font-weight: 600; }
+/* This week's swaps and the saving goal. */
+.td-goals:empty { display: none; }
+.td-goals { display: grid; gap: var(--s-2); }
+.td-pick { gap: var(--s-3); }
+.td-pick .grow { display: grid; }
+.td-did { flex: none; min-height: var(--tap); }
+.td-goal { display: grid; gap: 4px; padding: var(--s-3); border-radius: var(--r-tile); background: var(--fill); }
+.td-goal-h { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--s-1) var(--s-3); }
+.td-goal-h b { font-weight: 600; }
+.td-goal-bar { height: 6px; border-radius: var(--r-pill); background: var(--fill-2); overflow: hidden; margin: 2px 0; }
+.td-goal-bar i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
 .td-h { margin: var(--s-1) 0 0; font-weight: 600; color: var(--ink-2); }
 .td-none, .td-fine { margin: 0; }
 .td-tx { display: block; overflow-wrap: anywhere; }
 .list .row .grow:has(.td-tx) { display: grid; }
 .td-in { color: var(--accent-ink); }
-.td-mono { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--r-well);
-  background: var(--fill-2); color: var(--ink-2); font-family: var(--round); font-weight: 700; font-size: .824rem; }
-.td-mono.in { background: var(--accent-soft); color: var(--accent-ink); }
+
 /* Days are buttons: tap to list that day's charges. */
 .td-day { border: 0; background: none; padding: var(--s-2) 0; border-radius: var(--r-tile); cursor: pointer; font: inherit; color: inherit;
   -webkit-tap-highlight-color: transparent; transition: background var(--fade); }
@@ -48,7 +76,7 @@
 .tw-good { color: var(--accent-ink); }
 .tw-bad { color: var(--food-ink); }
 .tw-pace { margin: var(--s-3) var(--s-1) 0; color: var(--ink-2); }
-.tw-today { display: grid; }
+.tw-today { display: grid; margin-top: var(--s-3); }
 .tw-row { display: flex; justify-content: space-between; align-items: center; gap: var(--s-3); min-height: 40px; }
 .tw-row + .tw-row { box-shadow: 0 -.5px 0 var(--hair); }
 .tw-row b { font-weight: 600; }
@@ -72,8 +100,8 @@
 .tw-fine { margin: var(--s-4) var(--s-1) 0; }
 
 /* Refresh status and what's new. */
-.td-sync { display: flex; align-items: center; gap: var(--s-2); color: var(--ink-3); margin: calc(-1 * var(--s-1)) 0 0; }
-.td-sync-t { flex: 1; min-width: 0; }
+.td-sync { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--s-2); color: var(--ink-3); margin: calc(-1 * var(--s-1)) 0 0; }
+.td-sync-t { flex: 1 1 10rem; min-width: 0; }
 .td-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-4); flex: none; }
 .td-sync[data-state="same"] .td-dot, .td-sync[data-state="fresh"] .td-dot { background: var(--accent); }
 .td-sync[data-state="error"] .td-dot { background: var(--food); }

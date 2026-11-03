@@ -1,41 +1,41 @@
 /* Swap deck (Swaps tab).
    A stack of solid cards, one swap each, from api.swaps() for the active profile and its facts.
-   Fling right (or the check button, or Right arrow) to make it "This week's swap"; fling left
-   (or the x, or Left arrow) for "Not now". There is one swap per week: picking another replaces
-   it and says so. The pick lives in store "deckPick" (the Week receipt, Move-in and Chat read it).
+   Fling right (or the check button, or Right arrow) to add it to this week's swaps; fling left
+   (or the x, or Left arrow) for "Not now". Picks live in window.SwapPicks (swapmath.js): store
+   "deckPicks" keyed by the current week, so a new week starts empty with a one-tap "Keep last
+   week's swaps". Each pick shows how it counts ("6 × $12 = $72 a week", window.SwapMath), so the
+   rows add up to the total, and a "Did it" tally for the week.
    Signature motion: the physical fling (release velocity carries into the throw). Nothing else
    moves expressively. Reduced motion: cards cross-fade instead. */
 Swap.feature({
   id: "deck",
   title: "Swap deck",
-  pitch: "Swipe right to pick this week's swap.",
+  pitch: "Swipe right to add a swap to this week.",
   tab: "swaps",
   order: 1,
 
   render(slot, api) {
+    // swapmath.js comes before the features in index.html. If a build doesn't have it yet, load it
+    // and render once it arrives, instead of failing.
+    if (!window.SwapMath || !window.SwapPicks) {
+      const self = this;
+      let off = false, inner = null;
+      let s = document.querySelector("script[data-swapmath]");
+      if (!s) { s = document.createElement("script"); s.src = "swapmath.js"; s.dataset.swapmath = "1"; document.head.appendChild(s); }
+      const go = () => { if (!off && window.SwapPicks && !inner) inner = self.render(slot, api) || null; };
+      s.addEventListener("load", go);
+      return () => { off = true; s.removeEventListener("load", go); if (typeof inner === "function") inner(); };
+    }
     const { el, esc, money, haptic, store, toast, animate } = api;
+    const SM = window.SwapMath, SP = window.SwapPicks;
     const offs = [];
     let alive = true;
-    // The lower-fare ride app (shown as Lower-fare app on the private build) is never a swap or a logo pick.
-    const rideApp = (api, name) => typeof api.isRideApp === "function" ? api.isRideApp(name) : /lower-fare|rideapp/i.test(String(name || ""));
-    // The founder's live build recommends Lower-fare app for Uber/Lyft rides (core decides; default off).
-    const rideOK = api => typeof api.rideAppAllowed === "function" && !!api.rideAppAllowed();
-    const UNIT = { week: "a week", order: "an order", meal: "a meal", ride: "a ride", month: "a month" };
-    // Pickup swap whose place isn't in the student's own price gaps: show the gaps it really has.
-    const adaptSwap = s => {
-      if (!/^pick ?up\s/i.test(s.title)) return s;
-      const gaps = api.data.priceGaps || [], place = s.title.replace(/^pick ?up\s+/i, "").toLowerCase();
-      if (!gaps.length || gaps.some(g => g.place.toLowerCase() === place)) return s;
-      const avg = Math.round(gaps.reduce((t, g) => t + g.delivered - g.pickup, 0) / gaps.length);
-      const top = gaps.slice().sort((a, b) => (b.delivered - b.pickup) - (a.delivered - a.pickup))[0];
-      return Object.assign({}, s, { title: "Pick up instead of delivery", detail: "Same food. No delivery markup.", save: avg, unit: "order",
-        basis: `${top.place}: delivered ${money(top.delivered)} vs pickup ${money(top.pickup)}` });
-    };
+    // The lower-fare ride app is never a swap unless core allows it (api.rideAppAllowed).
+    const rideOK = () => typeof api.rideAppAllowed === "function" && !!api.rideAppAllowed();
+    const per = s => SM.per(s);
     // One badge for the screen, and none on the live "You" build (estimates from real data).
-    const badge = () => {
-      if (typeof api.badge === "function") { const b = api.badge("swaps"); if (typeof b === "string") return b; }
-      return api.data.live ? "" : `<span class="sample">Sample</span>`;
-    };
+    const badge = () => typeof api.badge === "function" ? api.badge("swaps") : "";
+    SP.sync(api);
 
     // ---------- which swaps fit this student ----------
     // api.swaps() already drops the lower-fare app, night rides and swaps whose `needs` fail
@@ -47,101 +47,112 @@ Swap.feature({
       const ranLate = api.charges().some(c => c.kind === "ride" && !c.night && c.tag === "late");
       const noSubway = f.subwayMinutes == null || f.subwayMinutes > 30 || ranLate;
       // Cancelling a subscription isn't a weekly swap: those live in "All swaps" only.
-      return api.swaps().filter(s => !s.sub && !s.night && (rideOK(api) || !rideApp(api, `${s.title} ${s.detail} ${s.basis}`)) && !(noSubway && /subway|train/i.test(`${s.id} ${s.title}`))).map(adaptSwap);
+      return api.swaps().filter(s => !s.sub && !s.night && (rideOK() || !api.isRideApp(`${s.title} ${s.detail} ${s.basis}`)) && !(noSubway && /subway|train/i.test(`${s.id} ${s.title}`))).map(s => SM.adapt(api, s));
     }
     let SWAPS = eligible();
     const byId = id => SWAPS.find(s => s.id === id);
+    const mark = (s, size) => SM.mark(api, s, size);
+    const pickIds = () => SP.state(api).ids;
 
-    // ---------- copy ----------
-    // Lead with the action, then the saving in the swap's own unit: "$16 an order", "$24 a week".
-    const per = s => UNIT[s.unit] || "a " + s.unit;
-    const iconKind = s => /coffee/i.test(s.title) ? "quick" : /subway|train/i.test(s.title) ? "transit"
-      : /ride|uber/i.test(s.title) ? "ride" : /pick ?up|dashpass|order|deliver/i.test(s.title) ? "delivery" : s.kind;
-    // A brand for the swap's logo (Chipotle, DashPass, MTA for the subway, the ride app for a split ride).
-    const brandOf = s => {
-      const text = `${s.title} ${s.detail || ""}`;
-      if (rideApp(api, text)) return null;   // the ride app gets the generic ride glyph, never a logo
-      if (api.logo(s.title)) return s.title;
-      if (/subway|train/i.test(text)) return "MTA";
-      if (api.logo(text)) return text;
-      if (/\bride\b/i.test(text)) { const c = api.charges().find(x => x.kind === "ride" && !x.night && x.tag === "out" && !rideApp(api, x.merchant) && api.logo(x.merchant)); return c ? c.merchant : null; }
-      return null;
-    };
-    const mark = (s, size) => api.brandMark(brandOf(s), iconKind(s), size);
-    const pickId = () => store.get("deckPick");
-    const pickSwap = () => byId(pickId()) || null;
-
-    // ---------- state (per profile, via api.store) ----------
+    // ---------- state (per profile, via api.store; the deck position restarts each week) ----------
+    const WEEK = SP.week(api);
     const fresh = () => {
-      const ids = SWAPS.map(s => s.id), p = pickId();
-      if (p && ids.includes(p)) { ids.splice(ids.indexOf(p), 1); ids.push(p); }   // current pick goes last
-      return { order: ids, i: 0 };
+      const ids = SWAPS.map(s => s.id), mine = pickIds();
+      // Swaps already picked go last.
+      return { order: ids.filter(id => !mine.includes(id)).concat(ids.filter(id => mine.includes(id))), i: 0, week: WEEK };
     };
     let st = store.get("deckState");
-    const valid = o => o && Array.isArray(o.order) && o.order.length === SWAPS.length && o.order.every(id => byId(id)) && Number.isInteger(o.i);
+    const valid = o => o && Array.isArray(o.order) && o.order.length === SWAPS.length && o.order.every(id => byId(id)) && Number.isInteger(o.i) && (o.week || null) === (WEEK || null);
     if (!valid(st)) st = fresh();
-    st = { order: st.order, i: Math.min(st.i, st.order.length) };
+    st = { order: st.order, i: Math.min(st.i, st.order.length), week: WEEK };
     const save = () => store.set("deckState", st);
 
     // ---------- markup ----------
     const root = el(`<div class="dk">
       <div class="dk-area"></div>
       <p class="vh" aria-live="polite" data-sr></p>
-      <h2 class="section-title" id="dk-pick-h">This week's swaps ${badge()}</h2>
+      <h2 class="section-title" id="dk-pick-h" tabindex="-1">This week's swaps ${badge()}</h2>
       <section class="card dk-pick" aria-labelledby="dk-pick-h"></section>
     </div>`);
     slot.appendChild(root);
     const area = root.querySelector(".dk-area"), sr = root.querySelector("[data-sr]"), pickBox = root.querySelector(".dk-pick");
+    const pickH = root.querySelector("#dk-pick-h");
     let stack = null, cards = [];
 
     const say = t => { sr.textContent = ""; setTimeout(() => { if (alive) sr.textContent = t; }, 40); };
     const count = () => api.setSub("swaps", SWAPS.length ? (st.i < st.order.length ? `${st.i + 1} of ${st.order.length}` : `All ${st.order.length} seen`) : "");
+    const wk = n => `<span class="num">${money(n)}</span><span aria-hidden="true" class="t-foot t-3">/wk</span><span class="vh"> a week</span>`;
 
-    // ---------- this week's swap (below the deck) ----------
-    let replaced = null;
-    // Every "yes" adds a swap to this week's list (store "deckPicks"); nothing is replaced.
-    // "deckPick" stays the first one, for the Week receipt, Move-in and Chat.
-    const picks = () => {
-      const l = (store.get("deckPicks") || []).filter(id => byId(id));
-      const one = pickId();
-      return one && byId(one) && !l.includes(one) ? [one].concat(l) : l;
-    };
-    const setPicks = ids => {
-      selfSet = true; store.set("deckPicks", ids); store.set("deckPick", ids[0] || null); selfSet = false;
-    };
-    // About how much a swap saves in a week: half as often as you do it now (at least once),
-    // a monthly cancel at its weekly share, a weekly swap as is.
-    const weekly = s => s.unit === "month" ? s.save * 12 / 52 : s.unit === "week" ? s.save
-      : typeof s.perWeek === "number" ? s.save * Math.max(1, Math.round(s.perWeek / 2)) : s.save;
-    function renderPick() {
-      const list = picks().map(byId).filter(Boolean);
-      const total = Math.round(list.reduce((t, s) => t + weekly(s), 0)), goal = api.data.thisWeek.saveTarget || 0;
+    // ---------- this week's swaps (below the deck) ----------
+    // Every "yes" adds a swap (SwapPicks.add). The total is the sum of the rows' weekly amounts.
+    let drawn = "";
+    function renderPick(force) {
+      if (!alive) return;
+      const list = SP.list(api), last = list.length ? [] : SP.lastList(api);
+      // Same picks as on screen (a store echo of our own write): keep the DOM, and focus, as is.
+      const sig = JSON.stringify([list.map(p => [p.id, p.done, p.weekly]), last.map(p => p.id), api.data.thisWeek.saveTarget]);
+      if (sig === drawn && !force) return;
+      drawn = sig;
+      const total = list.reduce((t, p) => t + p.weekly, 0), goal = api.data.thisWeek.saveTarget || 0;
+      const row = p => {
+        const s = p.swap;
+        return `<li class="row dk-pick-row" data-id="${esc(s.id)}">${mark(s, 36)}
+          <div class="grow"><p class="t-sub dk-pick-t">${esc(s.title)}</p>
+            <p class="t-foot t-3 dk-pick-a">${esc(p.formula)}</p>
+            ${s.when ? `<p class="t-foot t-3 dk-pick-a">${esc(s.when)}</p>` : ""}
+            <div class="dk-pick-acts">
+              <button class="btn tint small dk-did" data-id="${esc(s.id)}" aria-label="Did it: ${esc(s.title)}. ${p.done} of ${p.target} this week">Did it</button>
+              <span class="t-foot t-2 dk-tally" aria-hidden="true"><span class="num">${p.done}</span> of <span class="num">${p.target}</span></span>
+              <button class="btn plain small dk-unpick" data-id="${esc(s.id)}" aria-label="Remove ${esc(s.title)}">Remove</button>
+            </div></div>
+          <span class="amt">${wk(p.weekly)}</span></li>`;
+      };
       pickBox.innerHTML = list.length
         ? `<div class="dk-picks-sum"><span class="t-foot t-3">About</span> <b class="num">${money(total)}</b> <span class="t-foot t-3">a week${goal ? ` of your ${money(goal)} goal` : ""}</span></div>
-           <div class="list">${list.map(s => `<div class="row dk-pick-row">${mark(s, 36)}
-             <div class="grow"><p class="t-sub dk-pick-t">${esc(s.title)}</p>
-               <p class="t-foot t-3 dk-pick-a">About <span class="num">${money(s.save)}</span> ${per(s)}</p></div>
-             <button class="btn plain small dk-unpick" data-id="${esc(s.id)}" aria-label="Remove ${esc(s.title)}">Remove</button></div>`).join("")}</div>`
-        : `<p class="t-sub t-2 dk-empty">No swaps picked. Swipe right to add one.</p>`;
-      pickBox.querySelectorAll(".dk-unpick").forEach(b => b.addEventListener("click", () => {
-        haptic(); const s = byId(b.dataset.id);
-        setPicks(picks().filter(id => id !== b.dataset.id));
-        renderPick(); toast(`Removed: ${s ? s.title : "swap"}`);
-      }));
-      const ids = picks();
+           <ul class="list dk-picks" role="list">${list.map(row).join("")}</ul>`
+        : last.length
+          ? `<p class="t-sub t-2 dk-empty" tabindex="-1">New week. No swaps picked yet.</p>
+             <p class="t-foot t-3 dk-last">Last week: ${last.map(p => esc(p.swap.title)).join(", ")}. About <span class="num">${money(last.reduce((t, p) => t + p.weekly, 0))}</span> a week.</p>
+             <button class="btn tint block dk-keep">Keep last week's swaps</button>`
+          : `<p class="t-sub t-2 dk-empty" tabindex="-1">No swaps picked. Swipe right to add one.</p>`;
+      const ids = list.map(p => p.id);
       cards.forEach(c => c.classList.toggle("is-pick", ids.includes(c.dataset.id)));
     }
+    const focusIn = sel => { const n = sel && pickBox.querySelector(sel); (n || pickH).focus({ preventScroll: true }); };
+    pickBox.addEventListener("click", e => {
+      const b = e.target.closest("button");
+      if (!b || !pickBox.contains(b)) return;
+      const id = b.dataset.id;
+      if (b.classList.contains("dk-unpick")) {
+        haptic();
+        const all = [...pickBox.querySelectorAll(".dk-unpick")], idx = all.indexOf(b), s = SP.list(api).find(p => p.id === id);
+        SP.remove(api, id); renderPick();
+        const left = pickBox.querySelectorAll(".dk-unpick");
+        left.length ? left[Math.min(idx, left.length - 1)].focus({ preventScroll: true }) : focusIn(".dk-keep, .dk-empty");
+        toast(`Removed: ${s ? s.swap.title : "swap"}`, "check", { action: { label: "Undo", onClick: () => { SP.add(api, id); renderPick(); focusIn(`.dk-unpick[data-id="${CSS.escape(id)}"]`); } } });
+      } else if (b.classList.contains("dk-did")) {
+        haptic("success");
+        const n = SP.done(api, id), p = SP.list(api).find(x => x.id === id);
+        renderPick(); focusIn(`.dk-did[data-id="${CSS.escape(id)}"]`);
+        if (p) toast(`${p.swap.title}: ${n} of ${p.target} this week`, "check", { action: { label: "Undo", onClick: () => { SP.done(api, id, n - 1); renderPick(); } } });
+      } else if (b.classList.contains("dk-keep")) {
+        haptic("success");
+        const n = SP.lastList(api).length;
+        SP.keepLast(api); renderPick(); focusIn(".dk-did");
+        toast(`Kept ${n} ${n === 1 ? "swap" : "swaps"} for this week`);
+      }
+    });
     function choose(s) {
-      const ids = picks();
-      if (ids.includes(s.id)) { toast(`Already picked: ${s.title}`); return; }
-      setPicks(ids.concat(s.id));
+      if (SP.has(api, s.id)) { toast(`Already picked: ${s.title}`); return; }
+      SP.add(api, s.id);
       toast(`Added: ${s.title}`);
       renderPick();
       if (!api.reduced) animate(pickBox, [{ opacity: .4 }, { opacity: 1 }], { preset: "snappy" });
     }
-    // Move-in or Chat changed the pick: show it, don't reset the deck.
-    let selfSet = false;
-    offs.push(store.on("deckPick", () => { if (!selfSet && alive) { replaced = null; renderPick(); } }));
+    // Your goal, Move-in or Chat changed the picks: show them, don't reset the deck.
+    let queued = false;
+    const later = () => { if (queued) return; queued = true; queueMicrotask(() => { queued = false; renderPick(); }); };
+    offs.push(store.on("deckPicks", later), store.on("deckPick", later));
 
     // ---------- the stack ----------
     // Depth poses: the top card, then two cards peeking below it.
@@ -158,9 +169,10 @@ Swap.feature({
         <h2 class="t-title2 dk-t" id="dk-t-${s.id}">${esc(s.title)}</h2>
         <p class="t-sub t-2 dk-detail">${esc(s.detail)}</p>
         <p class="dk-amt"><span class="t-sub t-2">About</span> <span class="n-l">${money(s.save)}</span> <span class="t-sub t-2">${per(s)}</span></p>
-        <p class="t-foot t-3 dk-basis">${esc(s.basis.replace(/\s*→\s*/g, " vs "))}</p>
+        <p class="t-foot t-2 dk-wk">${SM.timesPerWeek(s) === 1 && !SM.isMonthly(s) ? `Counts once a week: ${money(SM.weeklySave(s))}` : esc(SM.formula(s))}</p>
+        <p class="t-foot t-3 dk-basis">${esc(String(s.basis || "").replace(/\s*→\s*/g, " vs "))}${s.when ? `<br>${esc(s.when)}` : ""}</p>
       </article>`);
-      c.classList.toggle("is-pick", s.id === pickId());
+      c.classList.toggle("is-pick", pickIds().includes(s.id));
       bind(c);
       return c;
     }
@@ -318,10 +330,10 @@ Swap.feature({
 
     // The deck ran out: say so, offer another look, and move focus to the heading.
     function ended(byUser) {
-      const n = st.order.length, s = pickSwap();
+      const n = st.order.length, np = pickIds().length;
       const node = el(`<div class="card dk-end">
         <h2 class="t-title3" data-title>All ${n} seen</h2>
-        <p class="t-sub t-2">${picks().length ? `${picks().length} ${picks().length === 1 ? "swap" : "swaps"} picked this week` : "No swaps picked"}</p>
+        <p class="t-sub t-2">${np ? `${np} ${np === 1 ? "swap" : "swaps"} picked this week` : "No swaps picked"}</p>
         <button class="btn secondary block dk-again">Look again</button></div>`);
       // If the deck is on screen, the end card lands in the stack under the last card as it
       // flies off, and focus moves to its heading right away.
@@ -347,8 +359,7 @@ Swap.feature({
       if (!alive) return;
       SWAPS = eligible();
       if (!valid(st)) { st = fresh(); save(); }
-      replaced = null;
-      renderPick();
+      renderPick(true);
       st.i >= st.order.length ? ended(false) : deck(false);
     };
     document.addEventListener("swap:facts", onFacts);

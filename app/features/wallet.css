@@ -71,11 +71,10 @@
 .wl-subs-sum .wl-hero { margin: 0; }
 .wl-subs-sum .n-l { font-size: min(2.353rem, 15vw); }
 .wl-subs-sum b { color: var(--ink); font-weight: 600; }
-.wl-showhidden { justify-self: start; min-height: var(--tap); padding: 0; color: var(--ink-2); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--ink-4); }
 .wl-sublist { list-style: none; margin: 0; padding: 0; }
 .wl-sublist[hidden] { display: none; }
 
-/* A row: a sliding face over a Hide action. Swipe left, or focus Hide with a keyboard, to reveal it. */
+/* A row: a sliding face over a "Mark cancelled" action. Swipe left, or focus it with a keyboard, to reveal it. */
 .wl-sub { position: relative; overflow: hidden; }
 .wl-sub + .wl-sub { box-shadow: 0 -.5px 0 var(--hair); }
 .wl-sub-fg { position: relative; z-index: 1; display: grid; grid-template-columns: 36px minmax(0, 1fr); align-items: center; column-gap: var(--s-3);
@@ -83,7 +82,7 @@
   transition: translate var(--dur-standard) var(--ease-standard); }
 .wl-sub-fg.dragging { transition: none; }
 .wl-sub.is-open .wl-sub-fg { translate: -88px 0; }
-.wl-sub:has(.wl-hide-act:focus-visible) .wl-sub-fg { translate: -88px 0; }
+.wl-sub:has(.wl-gone-act:focus-visible) .wl-sub-fg { translate: -88px 0; }
 .wl-sub-main { display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--s-3); row-gap: 2px; min-width: 0; }
 .wl-sub-main .grow { flex: 1 1 5rem; display: grid; min-width: 0; }
 .wl-name-btn { justify-self: start; text-align: left; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; padding: 2px 0; min-height: 28px; position: relative; }
@@ -94,12 +93,12 @@
 .wl-sub-amt b { font-family: var(--round); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .wl-sub-amt b span { font-family: var(--sys); font-weight: 400; margin-left: 1px; }
 .wl-sub-amt > span { white-space: nowrap; }
-.wl-hide-act { position: absolute; top: 0; right: 0; bottom: 0; width: 88px; z-index: 0; display: grid; place-items: center; font-weight: 600; background: var(--ink); color: var(--surface); }
-.wl-hide-act:focus-visible { outline: 2px solid var(--ink); outline-offset: -4px; box-shadow: inset 0 0 0 4px var(--surface); }
-/* Hidden rows keep full-contrast text; only the logo dims, and the row says "Hidden". */
-.wl-sub.is-hidden .brandmark { opacity: .45; }
-.wl-hidtag { font-weight: 600; color: var(--ink); }
-.wl-unhide { flex: none; }
+.wl-gone-act { position: absolute; top: 0; right: 0; bottom: 0; width: 88px; z-index: 0; display: grid; place-items: center; padding: 0 var(--s-2);
+  font-weight: 600; line-height: 1.2; text-align: center; background: var(--ink); color: var(--surface); }
+.wl-gone-act:focus-visible { outline: 2px solid var(--ink); outline-offset: -4px; box-shadow: inset 0 0 0 4px var(--surface); }
+/* Rows marked cancelled keep full-contrast text; only the logo dims, and the row says so. */
+.wl-sub.is-marked .brandmark { opacity: .45; }
+.wl-still { flex: none; min-height: var(--tap); }
 .wl-mono { font-family: var(--round); font-weight: 700; font-size: 1rem; color: var(--ink-2); }
 .wl-swipehint { margin: 0; padding: 0 var(--s-1); }
 .wl-ended { box-shadow: 0 -.5px 0 var(--hair); }
@@ -108,10 +107,4 @@
 .wl-ended-btn svg { color: var(--ink-3); transition: rotate var(--fade) ease-out; }
 .wl-ended-btn[aria-expanded="true"] svg { rotate: 180deg; }
 
-/* Undo toast: floats above the tab bar. */
-.wl-undo { position: absolute; left: var(--gutter); right: var(--gutter); bottom: calc(var(--bottom) + 76px); z-index: 44; display: flex; align-items: center; gap: var(--s-3);
-  padding: var(--s-2) var(--s-2) var(--s-2) var(--s-4); border-radius: var(--r-card); }
-.wl-undo[hidden] { display: none; }
-.wl-undo p { margin: 0; flex: 1; min-width: 0; font-weight: 600; }
-.wl-undo-btn { min-height: var(--tap); padding: 0 var(--s-4); border-radius: var(--r-pill); font-weight: 600; background: var(--ink); color: var(--surface); }
 @media (prefers-reduced-motion: reduce) { .wl-ended-btn svg, .wl-sub-fg { transition: none; } }

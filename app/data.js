@@ -116,7 +116,7 @@
   };
   if (L) {
     Object.assign(you, {
-      label: "You", blurb: "Your card, synced " + synced(L.generatedAt), syncedAt: L.generatedAt,
+      label: "You", blurb: "Your bank, synced " + synced(L.generatedAt), syncedAt: L.generatedAt,
       rideAppName: L.rideAppName || null,
       live: true,
       real: ["usual", "thisWeek", "weekly", "charges", "move", "ridePrices", "priceGaps", "memberships", "subway", "current", "dayWeights"],
@@ -128,16 +128,19 @@
       current: L.current || null, dayWeights: L.dayWeights || null
     });
     Object.assign(you.move, { rideSpendAfter: L.move.rideSpendAfter });
-    // The founder's own build: show the lower-fare app by name, and (his choice) recommend it over Uber/Lyft.
+    // The private build: show the lower-fare app by its own name (L.rideAppName, from .env), and,
+    // when the data allows it, recommend it over Uber/Lyft. The name is never written in this file.
     you.recommendRideApp = !!L.recommendRideApp;
+    const escRe = x => String(x).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const RIDE_RE = new RegExp(`lower-fare${L.rideAppName ? "|" + escRe(L.rideAppName) : ""}`, "i");
     if (you.recommendRideApp) {
       const med = re => (you.ridePrices.find(r => re.test(r.app)) || {}).median;
       const count = re => (you.ridePrices.find(r => re.test(r.app)) || {}).count || 0;
-      const cheap = med(/lower-fare|rideapp/i), dear = med(/uber/i) || med(/lyft/i);
+      const cheap = med(RIDE_RE), dear = med(/uber/i) || med(/lyft/i);
       const name = you.rideAppName || "Lower-fare app";
       // Share of rides already on the lower-fare app. Suggesting it only makes sense if Uber/Lyft is still common.
       const all = you.ridePrices.reduce((t, r) => t + (r.count || 0), 0);
-      you.rideAppShare = all ? count(/lower-fare|rideapp/i) / all : 0;
+      you.rideAppShare = all ? count(RIDE_RE) / all : 0;
       you.swaps = you.swaps.filter(x => x.id !== "rideapp-rides");
       if (cheap && dear && dear > cheap && you.rideAppShare < 0.8) {
         you.swaps = [{ id: "rideapp-rides", title: `${name} instead of Uber or Lyft`, detail: "Same trip, lower fare.",
@@ -145,10 +148,9 @@
           .concat(you.swaps);
       } else if (cheap) {
         // Already on the cheapest app: the next step down is the subway, daytime only.
-        const since = new Date(L.move.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
-        const n = count(/lower-fare|rideapp/i);
+        const n = count(RIDE_RE);
         you.swaps = [{ id: "subway-day", title: "Subway for daytime rides",
-          detail: `You already take ${name} for ${n} of ${all} rides since ${since}, so switching apps saves nothing. The next step down is the subway, daytime only. Night rides stay as they are.`,
+          detail: "Daytime only. Night rides stay as they are.",
           why: `${name} already: ${n} of ${all} rides`,
           save: Math.round(cheap - (L.subway && L.subway.fare || 3)), unit: "ride", kind: "move",
           basis: `Your ${name} median ${"$" + Math.round(cheap)} vs a $${L.subway && L.subway.fare || 3} fare`, needs: ["subway"] }]
@@ -170,13 +172,13 @@
         })
         .sort((a, b) => b.save - a.save);
       you.swaps = keep.filter(x => x.id === "rideapp-rides").concat(L.swapOptions, keep.filter(x => x.id === "dashpass-student"), subs);
-      // Keep the reasoning for the ride swap: he already rides the cheapest app.
+      // Keep the reasoning for the daytime subway swap (ride counts by app).
       const sub = you.swaps.find(x => x.id === "subway-day"), all = you.ridePrices.reduce((t, r) => t + (r.count || 0), 0);
-      const emp = (you.ridePrices.find(r => /lower-fare|rideapp/i.test(r.app)) || {}).count || 0;
+      const emp = (you.ridePrices.find(r => RIDE_RE.test(r.app)) || {}).count || 0;
       if (sub && you.rideAppShare >= 0.8) {
         const name = you.rideAppName || "Lower-fare app";
         sub.why = `${name} already: ${emp} of ${all} rides`;
-        sub.detail = `You already take ${name} for ${emp} of ${all} rides, so switching apps saves nothing. Daytime only. Night rides stay as they are.`;
+        sub.detail = "Daytime only. Night rides stay as they are.";
       }
     }
     you.memberships = you.memberships.map(m => m.name === "DashPass" ? Object.assign({}, m, { ordersPerWeek: L.deliveriesPerWeek }) : m);

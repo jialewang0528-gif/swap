@@ -56,10 +56,35 @@ DELIVERY_PATTERN = re.compile(
     re.IGNORECASE,
 )
 RIDE_PATTERN = re.compile(r"\buber\b|\blyft\b|\bcurb\b", re.IGNORECASE)
-# One lower-fare ride app's charges put the driver's name in the text and Plaid files them as
-# LOAN_PAYMENTS_CASH_ADVANCES, so they're matched on the app's billing tag instead of the category.
-# While a ride is pending the bank shows a hold ("RIDEAPP* HOLDFORDRIVER") instead of the billing tag.
-CHEAP_RIDE_APP_PATTERN = re.compile(r"driverideapp|rideapp\*\s*holdfordriver", re.IGNORECASE)
+
+
+class _RideAppPattern:
+    """Some lower-fare ride apps put the driver's name in the bank text and Plaid files them as
+    LOAN_PAYMENTS_CASH_ADVANCES, so they're matched on the app's billing tag instead of the category:
+    "<APP>* <driver> DRIVE<APP>" when posted, "<APP>* HOLDFORDRIVER" while pending.
+
+    The app's name is personal, so it only comes from .env: RIDE_APP_NAME (the tag is built from it),
+    or RIDE_APP_PATTERN (a full regex) for an app that bills differently. Unset = matches nothing.
+    Read on every call, so it works after pull.load_env() and in the cloud function's environment."""
+
+    _cache = (None, None)
+
+    def _compiled(self):
+        key = (os.environ.get("RIDE_APP_PATTERN", "").strip(), os.environ.get("RIDE_APP_NAME", "").strip())
+        if self._cache[0] != key:
+            pattern, name = key
+            if not pattern and name:
+                n = re.escape(re.sub(r"\s+", "", name.lower()))
+                pattern = rf"drive{n}|{n}\*\s*holdfordriver"
+            self._cache = (key, re.compile(pattern, re.IGNORECASE) if pattern else None)
+        return self._cache[1]
+
+    def search(self, text):
+        p = self._compiled()
+        return p.search(text or "") if p else None
+
+
+CHEAP_RIDE_APP_PATTERN = _RideAppPattern()
 # Alcohol: bars and liquor stores, plus delis, bodegas and convenience stores (where the beer is).
 # Card networks file a pending liquor-store charge as general merchandise, so names count too.
 # Clubs and lounges: nights out, even when the card network files them as a restaurant. Add your
@@ -183,12 +208,17 @@ def plaid(path, body):
         data=json.dumps(payload).encode(),
         headers={"Content-Type": "application/json"},
     )
+    # The cloud function sets PLAID_TIMEOUT below its own time limit, so a slow page ends as a
+    # clean error instead of the platform killing the function.
+    timeout = float(os.environ.get("PLAID_TIMEOUT") or 60)
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             return json.load(response)
     except urllib.error.HTTPError as e:
         error = json.load(e)
         sys.exit(f"Plaid error on {path}: {error.get('error_code')} - {error.get('error_message')}")
+    except (urllib.error.URLError, TimeoutError) as e:
+        sys.exit(f"Plaid unreachable on {path}: {getattr(e, 'reason', e)}")
 
 
 def fetch_all_transactions(access_token):

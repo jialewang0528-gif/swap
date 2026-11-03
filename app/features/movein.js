@@ -5,9 +5,9 @@
    averages, or "No big change found" plus the week trend when the profile has no move date.
    Two swaps come from api.swaps(), filtered and ranked by the answers. Night rides are never a target. */
 (function () {
-  // The lower-fare ride app (shown as Lower-fare app on the private build) is never a swap or a logo pick.
-  const rideApp = (api, name) => typeof api.isRideApp === "function" ? api.isRideApp(name) : /lower-fare|rideapp/i.test(String(name || ""));
-  // The founder's live build recommends Lower-fare app for Uber/Lyft rides (core decides; default off).
+  // The lower-fare ride app (shown by its real name only on the private build) is never a swap or a logo pick.
+  const rideApp = (api, name) => typeof api.isRideApp === "function" ? api.isRideApp(name) : /lower-fare/i.test(String(name || ""));
+  // The private build may recommend the lower-fare app for Uber/Lyft rides (core decides; default off).
   const rideOK = api => typeof api.rideAppAllowed === "function" && !!api.rideAppAllowed();
   const Q = [
     { key: "kitchen", q: "What kitchen do you have?", hint: "", opts: [["none", "No kitchen"], ["micro", "Microwave only"], ["shared", "Shared kitchen"], ["own", "My own kitchen"]] },
@@ -22,7 +22,8 @@
     nights: { "0": "No late nights", "1-2": "1–2 late nights", "3+": "3+ late nights" }
   };
   const UNIT = { week: "a week", order: "an order", meal: "a meal", ride: "a ride", month: "a month" };
-  const KIND_NAME = { ride: "Rides", delivery: "Delivery", dining: "Eating out", drinks: "Clubs, bars & bodega", quick: "Coffee & snacks", transit: "Subway" };
+  // Bank category names, same as Where your money goes and Whole bank. "drinks" covers two bank categories.
+  const KIND_NAME = { ride: "Rides", delivery: "Delivery", dining: "Eating out", drinks: "Clubs & bars, bodega & liquor", quick: "Coffee & snacks", transit: "Subway" };
   const complete = p => !!p && Q.every(q => p[q.key] != null);
   const plain = s => String(s).replace(/\s*→\s*/g, " to ");
   // Pickup swap whose place isn't in the student's own price gaps: show the gaps it really has.

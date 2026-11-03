@@ -1,20 +1,29 @@
-/* Swaps to hit the goal. Tokens only. */
+/* All swaps and Your goal. Tokens only. */
 .pl { display: grid; gap: var(--s-3); }
 .pl-head { display: flex; justify-content: space-between; align-items: flex-end; gap: var(--s-3); }
 .pl-head > div { display: grid; gap: 2px; }
-.pl-big { font-size: 2.353rem; font-weight: 700; line-height: 1.05; }
+.pl-big { font-size: 2.353rem; font-weight: 700; line-height: 1.05; color: var(--accent-ink); }
 .pl-sum { text-align: right; }
-.pl-sum b { font-size: 1.176rem; font-weight: 700; color: var(--accent-ink); }
-.pl .grow, .pl-all .grow { display: grid; }
+.pl-sum b { font-size: 1.176rem; font-weight: 700; }
+.pl .grow, .pl-all .grow { display: grid; min-width: 0; }
 .pl-t { overflow-wrap: anywhere; }
 .pl-short { margin: 0; color: var(--food-ink); }
+.pl-met { margin: 0; color: var(--accent-ink); font-weight: 600; }
+.pl-gap-h { margin: var(--s-2) 0 0; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--s-2); }
 .pl-fine { margin: 0; }
+.pl .list, .pl-all .list, .pl-ask .list { margin: 0; padding: 0; list-style: none; }
+.pl-row { align-items: flex-start; }
+.pl-row > .brandmark { margin-top: 2px; }
+.pl-row .amt { white-space: nowrap; }
 .pl-all { padding: var(--s-1) var(--s-4); }
-.pl-gone { flex: none; margin-right: calc(-1 * var(--s-2)); }
-.pl-gone-note { margin: var(--s-2) 0 var(--s-1); }
-.pl-undo { background: none; border: 0; padding: 0; color: var(--ink); text-decoration: underline; font: inherit; cursor: pointer; }
-.pl-ask-btn { margin-bottom: var(--s-3); }
+.pl-side { flex: none; display: grid; justify-items: end; gap: var(--s-2); }
+.pl-add { min-width: 4.5rem; min-height: var(--tap); }
+/* The one subscription control: a full-width row that opens the checklist. */
+.pl-ask-btn { display: flex; align-items: center; gap: var(--s-3); width: 100%; min-height: var(--tap); margin: 0; padding: var(--s-3) 0;
+  background: none; border: 0; box-shadow: 0 -.5px 0 var(--hair), 0 .5px 0 var(--hair); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.pl-ask-btn svg { flex: none; rotate: -90deg; color: var(--ink-3); }
+.pl-ask-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: var(--r-well); }
 .pl-ask { padding: var(--s-1) var(--s-4); margin-top: var(--s-3); }
 .pl-ask .grow { display: grid; }
-.pl-ask-row { cursor: pointer; }
+.pl-ask-row { display: flex; align-items: center; gap: var(--s-3); width: 100%; min-height: var(--tap); cursor: pointer; }
 .pl-ask-box { width: 22px; height: 22px; accent-color: var(--ink); flex: none; }

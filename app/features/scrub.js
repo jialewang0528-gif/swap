@@ -1,9 +1,10 @@
 /* By day (Scrub the week).
    Week tab, under the hero. Before the guess: bar shapes only, no amounts ("Guess first").
-   After the guess: a 7-day strip that opens on Sunday with the Mon–Sun total; drag or use arrow keys
-   to scrub back. The selected day's charges list below with a one-tap tag (saved per charge id).
-   A 24-hour lane places charges that have a time; charges the bank sent without a time get their
-   own lane, because Swap never guesses. Night rides are counted and protected. */
+   After the guess: a 7-day strip that opens on Sunday with the week's total ("Oct 26 – Nov 1"); drag or
+   use arrow keys to scrub back. The title names the week ("Last week · all spending"). The selected
+   day's charges list below (category.js txRow) with a quiet "Tag why" (saved per charge id).
+   "Time of day" folds into the card: a 24-hour lane for charges that have a time; charges the bank
+   sent without a time are counted, never guessed. Night rides are counted and protected. */
 (function () {
   const DAY = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const DAY_LONG = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -28,9 +29,9 @@
     const start = new Date((D.weekStart || D.today) + "T12:00:00");
     return DAY.map((_, k) => { const d = new Date(start); d.setDate(start.getDate() + k); return fmtDate(d); });
   }
-  // Bank names, cleaned for reading. core's api.displayMerchant() names the ride app (Lower-fare app on the
+  // Bank names, cleaned for reading. core's api.displayMerchant() names the ride app (its real name on the
   // private build); it is shown, never suggested, and gets the generic ride glyph, not a logo.
-  const rideApp = (api, name) => typeof api.isRideApp === "function" ? api.isRideApp(name) : /lower-fare|rideapp/i.test(String(name || ""));
+  const rideApp = (api, name) => typeof api.isRideApp === "function" ? api.isRideApp(name) : /lower-fare/i.test(String(name || ""));
   function displayName(api, name) {
     let n = String(typeof api.displayMerchant === "function" ? api.displayMerchant(name) : name || "").trim();
     if (n && n === n.toLowerCase()) n = n.replace(/(^|[\s.'-])([a-z])/g, (m, a, b) => a + b.toUpperCase());
@@ -57,6 +58,14 @@
       const clock = tm => { const [h, m] = tm.split(":").map(Number); return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`; };
       const rawTag = id => (D.charges.find(c => c.id === id) || {}).tag;
       let charges = [];
+      let timeOpen = false;
+      const hasBank = () => api.profile() === "you" && !!(window.SwapLive && window.SwapLive.bank && Array.isArray(window.SwapLive.bank.items));
+      // Section label names the week and what it counts, so a full-week total never reads as this week.
+      const whichWeek = () => {
+        const wk = typeof api.weekName === "function" ? api.weekName() : "";
+        const what = hasBank() ? "all spending" : "food and getting around";
+        return wk ? `${wk} · ${what}` : what;
+      };
       // Founder's build: every bank transaction that week, not just food and rides. Food and ride
       // charges keep their tags; everything else (Zelle, shopping, pay) is "other". Money in shows
       // in the day's list with a +, but never adds to the day's total.
@@ -94,7 +103,7 @@
         return DAY.map((d, k) => {
           const t = totals[k];
           const segs = neutral ? `<i class="sc-ghost" style="flex:1 1 0"></i>` : GROUPS.filter(g => t[g] > 0).map(g => `<i class="fill-${g}" style="flex:${t[g]} 1 0"></i>`).join("");
-          return `<div class="sc-col" aria-hidden="true"><div class="sc-barwrap"><div class="sc-bar" style="height:${(100 * t.all / maxDay).toFixed(1)}%">${segs}</div></div><b class="t-foot">${d}</b>${neutral ? "" : `<span class="num t-foot">${money(t.all)}</span>`}</div>`;
+          return `<div class="sc-col" aria-hidden="true"><div class="sc-barwrap"><div class="sc-bar" style="height:${(100 * t.all / maxDay).toFixed(1)}%">${segs}</div></div><b class="t-foot"><span class="d3">${d}</span><span class="d1">${d.charAt(0)}</span></b>${neutral ? "" : `<span class="num t-foot">${money(t.all)}</span>`}</div>`;
         }).join("");
       }
 
@@ -102,7 +111,7 @@
       function locked() {
         const totals = dayTotals(), maxDay = Math.max(1, ...totals.map(t => t.all));
         const root = el(`<div class="sc">
-          <h2 class="section-title">By day</h2>
+          <h2 class="section-title">By day <small>${esc(whichWeek())}</small></h2>
           <div class="card sc-card sc-locked">
             <div class="sc-strip static">${barsHTML(totals, maxDay, true)}</div>
             <p class="sc-lockmsg t-sub t-2">Amounts show after you guess.</p>
@@ -118,14 +127,14 @@
         const maxDay = Math.max(1, ...totals.map(t => t.all));
         const timedCount = charges.filter(c => c.time).length;
         const runTo = k => totals.slice(0, k + 1).reduce((s, t) => s + t.all, 0);
-        const rangeOf = k => (k === 0 ? "Mon" : `Mon–${DAY[k]}`);
+        const rangeOf = k => (k === 0 ? dates[0] : `${dates[0]} – ${dates[k]}`);
 
         const hasTimes = timedCount > 0;
         const root = el(`<div class="sc">
-          <h2 class="section-title">By day</h2>
+          <h2 class="section-title">By day <small>${esc(whichWeek())}</small></h2>
           <div class="card sc-card">
             <div class="sc-head">
-              <div><div class="t-foot t-2 sc-range">Mon–Sun</div><div class="n-l sc-total">$0</div></div>
+              <div><div class="t-foot t-2 sc-range">${esc(rangeOf(6))}</div><div class="n-l sc-total">$0</div></div>
               <div class="sc-day t-foot"></div>
             </div>
             <div class="sc-strip" role="slider" tabindex="0" aria-label="Day of the week" aria-valuemin="0" aria-valuemax="6">
@@ -135,10 +144,8 @@
             <div class="sc-legend t-foot t-2" aria-hidden="true">${GROUPS.filter(g => totals.some(t => t[g] > 0)).map(g => `<span><i class="dot ${g}"></i>${GROUP_LABEL[g]}</span>`).join("")}</div>
             <ul class="sc-list" aria-label="Charges"></ul>
             <p class="sc-protect t-foot t-2" hidden>${icon("moon", 14, 2)}<span>Night rides, 11 PM–6 AM: always OK</span></p>
-            ${hasTimes ? "" : `<p class="sc-notimes t-foot t-2">Bank sent no times.</p>`}
-          </div>
-          ${hasTimes ? `<h2 class="section-title">Time of day</h2>
-          <div class="card sc-time">
+            ${hasTimes ? `<details class="bk-more sc-time"${timeOpen ? " open" : ""}><summary class="t-sub">Time of day <span class="t-foot t-3">${timedCount} with a time</span>${icon("chevronDown", 16, 2.4)}</summary>
+            <div class="sc-time-body">
             <div class="sc-time-head"><span class="t-sub t-2 sc-lane-day"></span></div>
             <div class="sc-lane" role="img">
               <span class="sc-band a"></span><span class="sc-band b"></span>
@@ -150,7 +157,8 @@
             <div class="sc-axis t-cap t-3" aria-hidden="true"><span style="left:0">12 AM</span><span style="left:25%">6 AM</span><span style="left:50%">Noon</span><span style="left:75%">6 PM</span><span style="left:100%">12 AM</span></div>
             <div class="sc-key t-foot t-2"><i></i>Night, 11 PM–6 AM</div>
             <p class="sc-none t-foot t-2"></p>
-          </div>` : ""}
+            </div></details>` : `<p class="sc-notimes t-foot t-2">Times not available from your bank.</p>`}
+          </div>
         </div>`);
         slot.appendChild(root);
 
@@ -159,6 +167,8 @@
         const cols = [...root.querySelectorAll(".sc-col")], bars = cols.map(c => c.querySelector(".sc-bar"));
         const rangeEl = $(".sc-range"), totalEl = $(".sc-total"), dayEl = $(".sc-day");
         const marks = $(".sc-marks"), noneEl = $(".sc-none"), lane = $(".sc-lane");
+        const timeDet = $(".sc-time");
+        timeDet && timeDet.addEventListener("toggle", () => { timeOpen = timeDet.open; });
 
         const paintBars = () => {
           totals = dayTotals();
@@ -194,36 +204,47 @@
         };
 
         // Day list
+        const C = window.SwapCategory || {};
+        const bankCat = new Map(((api.profile() === "you" && window.SwapLive && window.SwapLive.bank && window.SwapLive.bank.items) || []).map(i => [i.id, i.cat]));
+        const catOf = c => c.cat || bankCat.get(c.id) || (C.KIND_CAT || {})[c.kind] || GROUP_LABEL[groupOf(c)];
+        // One row style for every transaction list (category.js txRow): mark, name, "Category · time", amount.
+        const txRow = (c, o) => C.txRow
+          ? el(C.txRow(api, { name: c.merchant, amount: c.amount, cat: catOf(c), time: c.time, pending: c.pending,
+              tone: c.kind === "other" ? "other" : groupOf(c) }, Object.assign({ tag: "li", cls: "sc-row", attrs: `data-id="${esc(c.id)}"` }, o)))
+          : el(`<li class="sc-row tx-row" data-id="${esc(c.id)}"><span></span><span class="tx-main"><b class="t-sub tx-name">${esc(displayName(api, c.merchant))}</b></span><span class="tx-amt num">${money(c.amount)}</span></li>`);
         function rowFor(c) {
-          if (c.kind === "other") return otherRow(c);
+          const inn = c.amount < 0;
+          if (c.kind === "other") return txRow(c, { prefix: inn ? "Money in" : GROUP_LABEL.other });
           const g = groupOf(c), tg = c.tag, editable = g !== "night" && (rawTag(c.id) == null || (store.get("tags") || {})[c.id] != null);
           const name = displayName(api, c.merchant);
-          const label = g === "night" ? `${icon("moon", 12, 2.2)}Night` : tg ? esc(tg) : `${icon("plus", 12, 2.6)}Tag`;
+          // Untagged rows get a quiet "Tag why" text button, not a pill on every row.
+          const label = g === "night" ? `${icon("moon", 12, 2.2)}Night` : tg ? esc(tg) : "Tag why";
           const cls = g === "night" ? "prot" : !tg ? "add" : editable ? "set" : "";
-          const aria = tg ? `Tag: ${tg}. Change tag for ${name}` : `Add a tag to ${name}`;
+          const aria = tg ? `Why: ${tg}. Change for ${name}` : `Tag why you bought ${name}`;
           const chip = editable
             ? `<button class="sc-chip ${cls} t-foot" aria-expanded="false" aria-label="${esc(aria)}">${label}</button>`
             : `<span class="sc-chip ${cls} t-foot">${label}</span>`;
-          const row = el(`<li class="sc-row" data-id="${esc(c.id)}">
-            ${api.brandMark(rideApp(api, c.merchant) ? null : c.merchant, c.kind === "ride" && c.night ? "night" : c.kind, 32)}
-            <div class="sc-main"><b class="t-sub"><span class="vh">${GROUP_LABEL[g]}: </span>${esc(name)}</b>
-              <div class="sc-meta t-foot">${c.time ? `<span class="num">${clock(c.time)}</span>` : hasTimes ? `<span class="t-3">No time</span>` : ""}${chip}</div></div>
-            <span class="amt t-body">${money(c.amount)}</span></li>`);
+          const row = txRow(c, { prefix: GROUP_LABEL[g], meta: chip });
           if (editable) row.querySelector("button.sc-chip").addEventListener("click", () => togglePick(row, c));
           return row;
         }
-        function otherRow(c) {
-          const name = displayName(api, c.merchant), inn = c.amount < 0;
-          const ch = String(name).replace(/^zelle (to|from) /i, "").trim().charAt(0).toUpperCase() || "$";
-          const mark = !/^zelle|^venmo/i.test(name) && api.logo(name) ? api.brandMark(name, "food", 32) : `<span class="sc-mono${inn ? " in" : ""}" aria-hidden="true">${esc(ch)}</span>`;
-          return el(`<li class="sc-row" data-id="${esc(c.id)}">${mark}
-            <div class="sc-main"><b class="t-sub"><span class="vh">${inn ? "Money in" : GROUP_LABEL.other}: </span>${esc(name)}</b>
-              <div class="sc-meta t-foot"><span class="t-3">${esc(c.cat || "")}${c.time ? ` · ${clock(c.time)}` : ""}${c.pending ? " · Pending" : ""}</span></div></div>
-            <span class="amt t-body${inn ? " sc-in" : ""}">${inn ? "+" + money(-c.amount, 2) : money(c.amount)}</span></li>`);
-        }
+        // Long days show the first 5 charges and one "Show N more" row; the choice holds while you stay on that day.
+        const FIRST = 5;
+        let showAll = false;
         function renderList() {
-          const day = ofDay(sel);
-          list.replaceChildren(...(day.length ? day.map(rowFor) : [el(`<li class="sc-row sc-nocharges t-sub t-2">No charges</li>`)]));
+          const day = ofDay(sel), cut = !showAll && day.length > FIRST + 1;
+          const rows = day.length ? (cut ? day.slice(0, FIRST) : day).map(rowFor) : [el(`<li class="sc-row sc-nocharges t-sub t-2">No charges</li>`)];
+          if (cut) {
+            const more = el(`<li class="sc-morerow"><button class="btn plain block sc-more t-sub">Show ${day.length - FIRST} more</button></li>`);
+            more.querySelector("button").addEventListener("click", () => {
+              haptic(); showAll = true; renderList();
+              // Focus lands on the first newly shown charge, not the top of the page.
+              const row = list.children[FIRST];
+              if (row) { const b = row.querySelector("button"); if (b) b.focus(); else { row.tabIndex = -1; row.focus(); } }
+            });
+            rows.push(more);
+          }
+          list.replaceChildren(...rows);
           protect.hidden = !day.some(c => groupOf(c) === "night");
         }
         function closePicks() {
@@ -292,7 +313,7 @@
         function select(k, first) {
           k = Math.max(0, Math.min(6, k));
           if (k === sel) return;
-          sel = k;
+          sel = k; showAll = false;
           moveLens(k, first);
           syncValue();
           if (first) { shown = runTo(k); totalEl.textContent = money(shown); }

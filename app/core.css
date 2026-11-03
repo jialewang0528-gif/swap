@@ -108,8 +108,8 @@ h1, h2, h3, p { overflow-wrap: break-word; }
 .panel .lede { color: var(--ink-2); font-size: 16px; line-height: 1.5; margin: 0 0 20px; max-width: 36ch; }
 .panel h2 { font-size: 13px; font-weight: 600; color: var(--ink-3); margin: 20px 4px 8px; }
 .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 3px; border-radius: 12px; background: var(--fill-2); }
-.seg button { min-height: 44px; border-radius: 9px; font-size: 13px; font-weight: 600; color: var(--ink-2); display: grid; place-items: center; gap: 0; line-height: 1.2; padding: 4px 6px; transition: background var(--fade), color var(--fade); }
-.seg button small { font-size: 11px; font-weight: 500; color: var(--ink-3); }
+.seg button { min-height: 44px; border-radius: 9px; font-size: .765rem; font-weight: 600; color: var(--ink-2); display: grid; place-items: center; gap: 0; line-height: 1.2; padding: 4px 6px; transition: background var(--fade), color var(--fade); }
+.seg button small { font-size: .647rem; font-weight: 500; color: var(--ink-3); }
 .seg button[aria-checked="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(20,22,42,.12), 0 0 0 .5px rgba(20,22,42,.04); }
 .feature-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
 .feature-list button { width: 100%; text-align: left; padding: 10px 12px; border-radius: 14px; display: grid; gap: 2px; transition: background .2s; }
@@ -300,6 +300,10 @@ h1, h2, h3, p { overflow-wrap: break-word; }
 .sheet .body::-webkit-scrollbar { display: none; }
 .sheet .body > :is(h1, h2):first-child, .sheet-title { margin: 0 52px 6px 0; }
 .sheet:has(.sheet-chrome .back:not([hidden])) .body { padding-top: 30px; }
+/* Large sheets: the chrome is an opaque bar as tall as the buttons, so scrolled rows never slide
+   under the Back chevron or the Close X. */
+.sheet:not(.inset) .sheet-chrome { height: 50px; background: var(--sheet-bg); }
+.sheet:not(.inset) .body, .sheet:not(.inset):has(.sheet-chrome .back:not([hidden])) .body { padding-top: 4px; }
 .sheet-title:focus, .sheet .body :is(h1, h2, h3)[tabindex="-1"]:focus { outline: none; }
 /* Actions pinned at the bottom of the sheet (api.sheetActions). */
 .sheet.has-actions .body { padding-bottom: 12px; }

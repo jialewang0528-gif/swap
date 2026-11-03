@@ -216,16 +216,45 @@
     t.saveTarget = amount;
     t.cap = p.usual.total - amount - owedOf(p);
   }
-  // The one cap formula. Every screen that shows a cap (onboarding, You sheet, Week, Chat) uses these.
-  function capOf(save) { const p = profileData(); return p.usual.total - (save == null ? p.thisWeek.saveTarget : save) - owedOf(p); }
-  function capParts(save) {
-    const p = profileData(), s = save == null ? p.thisWeek.saveTarget : save, owed = owedOf(p);
-    return { usual: p.usual.total, save: s, owed, cap: p.usual.total - s - owed, max: p.usual.total - owed };
+  // ---------- The one weekly target: "Budget" ----------
+  // Live "you" with whole-bank data (the founder's build): usual weekly FLEXIBLE spending (bank.flex,
+  // bills and subscriptions left out) minus the save target. Older bank data without flex falls back
+  // to all money out (bank.usualOut). Everyone else: food + getting around minus save (and owed).
+  // Every screen that names the weekly target (Today, the week sheet, You sheet, onboarding, Chat)
+  // reads it from here, so there is only ever one number.
+  function bankPlan() {
+    const p = profileData(), B = p.live && window.SwapLive && window.SwapLive.bank;
+    if (!B || !Array.isArray(B.items)) return null;
+    const F = B.flex && typeof B.flex === "object" ? B.flex : null;
+    const usual = F && F.usual > 0 ? F.usual : B.usualOut;
+    const w = F && Array.isArray(F.dayWeights) && F.dayWeights.length === 7 ? F.dayWeights : B.dayWeights;
+    if (!(usual > 0) || !Array.isArray(w) || w.length !== 7) return null;
+    const fixedCats = new Set(F && Array.isArray(F.fixedCats) ? F.fixedCats : []);
+    // A charge is fixed when sync tagged it, or (older items) when its category is a fixed one.
+    const isFixed = i => i.fixed === true || (i.fixed == null && fixedCats.has(i.cat));
+    return { B, flex: !!F, usual: Math.round(usual), weights: w, isFixed, fixedUsual: F ? Math.round(F.fixedUsual || 0) : 0 };
   }
-  // "$661 usual − $100 save" (+ " − $10 owed" only when something is owed).
+  // api.budget(save?) -> { budget, usual, save, owed, scope: "all" | "food+move", flex, fixedUsual }
+  function budget(save) {
+    const p = profileData(), s = save == null ? p.thisWeek.saveTarget : save, bp = bankPlan();
+    if (bp) return { budget: bp.usual - s, usual: bp.usual, save: s, owed: 0, scope: "all", flex: bp.flex, fixedUsual: bp.fixedUsual };
+    const owed = owedOf(p);
+    return { budget: p.usual.total - s - owed, usual: p.usual.total, save: s, owed, scope: "food+move", flex: false, fixedUsual: 0 };
+  }
+  // Older names for the same number (kept so every caller agrees).
+  function capOf(save) { return budget(save).budget; }
+  function capParts(save) {
+    const b = budget(save);
+    return { usual: b.usual, save: b.save, owed: b.owed, cap: b.budget, max: b.usual - b.owed, scope: b.scope };
+  }
+  // "$1,350 usual week − $100 save" (+ " − $10 owed" only when something is owed).
   function capLine(save) {
     const c = capParts(save);
-    return `${money(c.usual)} usual − ${money(c.save)} save${c.owed ? ` − ${money(c.owed)} owed` : ""}`;
+    return `${money(c.usual)} usual week − ${money(c.save)} save${c.owed ? ` − ${money(c.owed)} owed` : ""}`;
+  }
+  // Messages to the iPhone app (the notify handler): seen bank items, the save target. No-op on the web.
+  function nativePost(msg) {
+    try { const h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.notify; if (h) h.postMessage(msg); } catch (e) {}
   }
   // Living answers for the active profile: saved answers, else a sample profile's own facts as
   // answers. "you" starts blank: its default facts are guesses, not answers.
@@ -244,14 +273,16 @@
   ORDER.forEach(id => { const s = bucket(id).saveTarget; if (typeof s === "number" && s >= 0) applySave(D0.profiles[id], s); });
   // setSave(amount): sets the active profile's save target, recomputes its cap, re-renders features
   // and fires "swap:profile" (same detail as a switch) so profile-aware features redraw too.
+  // Returns the new weekly budget (api.budget().budget). thisWeek.cap stays the food + rides cap.
   function setSave(amount) {
-    const p = profileData(), max = p.usual.total - owedOf(p);
+    const p = profileData(), max = capParts(0).max;
     const a = Math.max(0, Math.min(max, Math.round(+amount || 0)));
-    if (a === p.thisWeek.saveTarget && typeof store.get("saveTarget") === "number") return p.thisWeek.cap;
+    if (a === p.thisWeek.saveTarget && typeof store.get("saveTarget") === "number") return budget().budget;
     applySave(p, a); store.set("saveTarget", a);
+    if (active === "you" && p.live) nativePost({ type: "plan", saveTarget: a });
     features.forEach(f => { if (!f.profileAware) renderFeature(f); });
     document.dispatchEvent(new CustomEvent("swap:profile", { detail: active }));
-    return p.thisWeek.cap;
+    return budget().budget;
   }
   function profiles() {
     return ORDER.map(id => { const p = D0.profiles[id]; return { id, label: p.label, short: p.short, source: p.source, blurb: p.blurb, active: id === active }; });
@@ -305,8 +336,15 @@
   // The lower-fare ride app: shown under its real name on the private build (profile.rideAppName),
   // never suggested anywhere. isRideApp(text) is the one never-suggest check; displayMerchant(name)
   // is the one display mapping.
-  const RIDE_APP = /lower-fare|rideapp/i;
-  const isRideApp = name => RIDE_APP.test(String(name || ""));
+  // The app's real name comes only from the data (profile.rideAppName, from .env via sync.py).
+  const escRe = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  let rideRe = null, rideReFor;
+  function rideAppRe() {
+    const n = (D0.profiles.you && D0.profiles.you.rideAppName) || "";
+    if (rideReFor !== n) { rideReFor = n; rideRe = new RegExp(`lower-fare${n ? "|" + escRe(n) : ""}`, "i"); }
+    return rideRe;
+  }
+  const isRideApp = name => rideAppRe().test(String(name || ""));
   // Only the founder's private build (profile.recommendRideApp) may suggest the ride app. Public and
   // sample profiles: never. Night rules still hold: a cheaper app at night is fine, skipping a night ride is not.
   const rideAppAllowed = () => !!profileData().recommendRideApp;
@@ -342,50 +380,88 @@
   const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const dateOf = s => { const [y, m, d] = String(s).slice(0, 10).split("-").map(Number); return new Date(y, m - 1, d, 12); };
   const fmt = (d, o) => d.toLocaleDateString("en-US", o);
-  // [{ i: 0..6, date: "2026-10-26", dow: "Mon", short: "Oct 26", label: "Mon, Oct 26", isToday }]
-  // Daily plan for THIS week (Mon to today). With whole-bank data (the founder's build) it covers
-  // ALL money out of the bank except investing: the weekly budget is his usual all-spending week
-  // (last 8 full weeks) minus the save target, split across the days by his own weekday pattern.
-  // Without it (sample profiles) it falls back to food + getting around and the food/ride cap.
-  // Days gone keep their first plan; what's left is spread over today and the days ahead, so an
-  // expensive day lowers the rest of the week. Money in (paybacks, pay) never counts against it.
-  // null when there is no current-week data, or the data is from an older week.
+  // Daily plan for THIS week (Mon to today, by the phone's date). With whole-bank data (the founder's
+  // build) it covers his flexible spending: the weekly budget (api.budget) split across the days by
+  // his own weekday pattern. Bills and subscriptions (bank.flex fixed items) stay out of the daily
+  // split and come back once as `bills`. Without bank data (sample profiles) it falls back to food +
+  // getting around. Days gone keep their first plan; what's left is spread over today and the days
+  // ahead, never below half of a day's first plan (after a big day the rest of the week stays usable,
+  // and `weekOver` says by how much the week is over). Money in never counts against it.
+  // Staleness: days after the last bank check and before today have no data (`stale`, shown as "–")
+  // and stay out of the status; `staleSince` is set then. If the data is from an older week, the plan
+  // is built for this week with no spending known yet.
+  // null when there is no current-week data at all (sample profiles without `current`).
+  const ON_PLAN = 5;   // within $5 of the plan counts as on plan, everywhere (card, sheet, Chat)
   function dailyPlan(save) {
-    const D = profileData(), B = D.live && window.SwapLive && window.SwapLive.bank;
-    const all = !!(B && Array.isArray(B.items) && B.usualOut && Array.isArray(B.dayWeights));
+    const D = profileData(), bp = bankPlan(), all = !!bp;
     const C = D.current;
     if (!C || !C.weekStart) return null;
-    const w = all ? B.dayWeights : D.dayWeights;
+    const w = all ? bp.weights : D.dayWeights;
     if (!Array.isArray(w) || w.length !== 7) return null;
-    const start = dateOf(C.weekStart), now = new Date(); now.setHours(12, 0, 0, 0);
-    const t = Math.round((now - start) / 864e5);
-    if (t < 0 || t > 6) return null;
+    const now = new Date(); now.setHours(12, 0, 0, 0);
+    const dataStart = dateOf(C.weekStart);
+    let start = dataStart, t = Math.round((now - dataStart) / 864e5);
+    // Samples keep their own fixed week; live data from an older week moves to the phone's week.
+    if (t < 0 || t > 6) {
+      if (!D.live) return null;
+      start = new Date(now); start.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+      t = Math.round((now - start) / 864e5);
+    }
+    const sameWeek = iso(start) === iso(dataStart);
     const add = (a, b) => a + b;
-    const s = save == null ? D.thisWeek.saveTarget : save;
-    const usual = all ? B.usualOut : D.usual.total;
-    const cap = all ? usual - s : capOf(save);
-    const charges = all
-      ? B.items.filter(i => i.week === "now").map(i => Object.assign({ merchant: i.name }, i))
+    const B = budget(save), s = B.save, usual = B.usual, cap = B.budget;
+    const raw = !sameWeek ? [] : all
+      ? bp.B.items.filter(i => i.week === "now").map(i => Object.assign({ merchant: i.name }, i, { fixed: bp.isFixed(i) }))
       : (C.charges || []);
+    const charges = raw.filter(c => !c.fixed), fixed = raw.filter(c => c.fixed);
+    // Last day the bank was checked, as a day of this week (-1 = before Monday).
+    const seen = D.live && ((window.SwapLive && window.SwapLive.bankCheckedAt) || D.syncedAt);
+    const lastDay = !sameWeek ? -1 : seen ? Math.min(t, Math.round((dateOf(seen) - start) / 864e5)) : t;
+    // Whole days with no bank data: after the last check and before today.
+    const isStale = i => i > lastDay && i < t;
     const spent = [0, 0, 0, 0, 0, 0, 0];
     charges.forEach(c => {
       if (!(c.amount > 0)) return;
       const d = all ? c.day : dayOf(c);
       if (d >= 0 && d < 7) spent[d] += c.amount;
     });
-    const before = spent.slice(0, t).reduce(add, 0), left = cap - before, wRest = w.slice(t).reduce(add, 0) || 1;
+    // Known days before today set what's left; stale days share the rest like days ahead.
+    const from = Math.min(t, lastDay + 1);   // first day whose plan comes from what's left
+    const before = spent.slice(0, from).reduce(add, 0);
+    const left = cap - before, wRest = w.slice(from).reduce(add, 0) || 1;
+    const floorRest = 0.5 * cap * wRest;
+    const rest = Math.max(left, floorRest);
     const days = w.map((x, i) => {
       const d = new Date(start); d.setDate(start.getDate() + i);
-      const plan = i < t ? cap * x : Math.max(0, left) * x / wRest;
+      const plan = i < from ? cap * x : rest * x / wRest;
       return { i, date: iso(d), dow: fmt(d, { weekday: "short" }), short: fmt(d, { month: "short", day: "numeric" }),
-        plan: Math.round(plan), spent: Math.round(spent[i] * 100) / 100, past: i < t, isToday: i === t };
+        plan: Math.round(plan), spent: Math.round(spent[i] * 100) / 100, past: i < t, isToday: i === t, stale: isStale(i) };
     });
-    const total = spent.reduce(add, 0), planSoFar = cap * w.slice(0, t).reduce(add, 0);
-    return { scope: all ? "all" : "food+move", usual, save: s, cap, weekStart: C.weekStart, today: t, days,
+    const total = spent.reduce(add, 0), planSoFar = cap * w.slice(0, from).reduce(add, 0);
+    const wBefore = w.slice(0, from).reduce(add, 0);
+    // Pace to Sunday: only from Wednesday on, so one day never drives a forecast.
+    const pace = t >= 2 && from >= 2 && wBefore > 0 ? Math.round(before / wBefore) : null;
+    const bills = Math.round(fixed.filter(c => c.amount > 0).reduce((a, c) => a + c.amount, 0) * 100) / 100;
+    const staleSince = from < t ? (seen || D.syncedAt || null) : null;
+    return { scope: all ? "all" : "food+move", flex: all && bp.flex, usual, save: s, cap, budget: cap, weekStart: iso(start), today: t, days,
       spent: Math.round(total * 100) / 100, left: Math.round((cap - total) * 100) / 100,
+      weekOver: Math.max(0, Math.round(total - cap)), floored: left < floorRest,
       todayPlan: days[t].plan, todayLeft: Math.round((days[t].plan - spent[t]) * 100) / 100,
-      aheadBy: Math.round(planSoFar - before), charges, syncedAt: D.syncedAt };
+      aheadBy: Math.round(planSoFar - before), knownDays: from, pace,
+      bills, fixedUsual: all ? bp.fixedUsual : 0, fixedCharges: fixed, charges,
+      staleSince, sameWeek, syncedAt: D.syncedAt };
   }
+  // One on-plan answer for the card, the week sheet and Chat.
+  // api.planStatus(P?) -> { state: "under" | "on" | "over", by, text, first }
+  function planStatus(P) {
+    P = P || dailyPlan();
+    if (!P) return null;
+    const a = P.aheadBy || 0, first = !P.knownDays;
+    if (first || Math.abs(a) <= ON_PLAN) return { state: "on", by: 0, text: "On plan", first };
+    return a > 0 ? { state: "under", by: a, text: `${money(a)} under plan`, first }
+      : { state: "over", by: -a, text: `${money(-a)} over plan`, first };
+  }
+  // [{ i: 0..6, date: "2026-10-26", dow: "Mon", short: "Oct 26", label: "Mon, Oct 26", isToday }]
   function weekDays() {
     const D = profileData(), s = dateOf(D.weekStart);
     return Array.from({ length: 7 }, (_, i) => {
@@ -400,9 +476,12 @@
     return a.getMonth() === b.getMonth() ? `${w[0].short} – ${b.getDate()}` : `${w[0].short} – ${w[6].short}`;
   }
   // True when today is after the week shown (live data shows the last full week).
-  const weekIsPast = () => profileData().today > weekDays()[6].date;
+  // Live data compares with the phone's date (old data must not keep saying "This week").
+  const weekIsPast = () => (profileData().live ? iso(new Date()) : profileData().today) > weekDays()[6].date;
   const weekName = () => weekIsPast() ? "Last week" : "This week";
-  const todayLabel = () => fmt(dateOf(profileData().today), { weekday: "long", month: "short", day: "numeric" });
+  // True when live data's week ended more than a week ago (the recap is older than "last week").
+  const weekIsOld = () => { const end = dateOf(weekDays()[6].date); end.setDate(end.getDate() + 7); return !!profileData().live && iso(new Date()) > iso(end); };
+  const todayLabel = () => fmt(profileData().live ? new Date() : dateOf(profileData().today), { weekday: "long", month: "short", day: "numeric" });
   const weekKey = () => profileData().weekStart;
 
   // ---------- Shell ----------
@@ -489,6 +568,18 @@
       else if (dy < 0) { up -= dy; down = 0; if (up > 12) minimized = false; }
     }
     appEl.classList.toggle("tb-min", minimized);
+    if (current === "week") weekNavTitle();
+  }
+  // Week tab: the compact title says "This week" over the Today card and "Last week" once the
+  // last-week recap (the guess hero and everything below it) reaches the nav bar.
+  function weekNavTitle() {
+    const wk = TABS.find(t => t.id === "week"), g = slots.guess;
+    let title = wk.title;
+    if (wk.title === "This week" && weekIsPast() && g && g.isConnected && g.offsetHeight) {
+      const navBottom = navbar.getBoundingClientRect().bottom;
+      if (g.getBoundingClientRect().top <= navBottom + 4) title = weekName();
+    }
+    if (navTitle.textContent !== title) navTitle.textContent = title;
   }
 
   function go(tab) {
@@ -533,7 +624,7 @@
       sh.inert = true; sh.setAttribute("aria-hidden", "true");   // no longer a modal while it animates out
       document.removeEventListener("keydown", onKey);
       const i = openSheets.indexOf(handle); if (i >= 0) openSheets.splice(i, 1);
-      if (!openSheets.length) behind.forEach(n => (n.inert = false));
+      if (!openSheets.length) { behind.forEach(n => (n.inert = false)); setTimeout(() => dispatchEvent(new Event("swap:sheets-closed")), 0); }
       sh.style.pointerEvents = "none"; scrim.style.pointerEvents = "none";   // a closing sheet takes no taps
       scrim.classList.remove("on");
       if (prevFocus && prevFocus.isConnected && prevFocus.focus) prevFocus.focus({ preventScroll: true });
@@ -618,9 +709,11 @@
 
   // ---------- You sheet: weekly save, reminders, where you live, whose data, set up again ----------
   // Opened from the avatar on every tab, or api.openYou("save" | "remind" | "home" | "whose").
+  // The iPhone app schedules these: Sunday 6 PM "Plan next week", and each morning at 8:30 the
+  // day's number ("Today: $X"). Onboarding uses the same list (api.reminders).
   const REMINDERS = [
-    { k: "sunday", title: "Sunday 6 PM recap", sub: "Week total and cap", icon: "week" },
-    { k: "daily", title: "Noon tag reminder", sub: "Tag why you bought it", icon: "receipt" }
+    { k: "sunday", title: "Plan next week", sub: "Sunday 6 PM", icon: "week" },
+    { k: "daily", title: "Morning number", sub: "8:30 AM, what you can spend today", icon: "receipt" }
   ];
   const SAVE_PRESETS = [25, 50, 100, 150];
   function youSheet(section) {
@@ -641,10 +734,10 @@
             <div class="you-presets" role="group" aria-label="Quick amounts">${SAVE_PRESETS.map(v =>
               `<button class="chip" data-v="${v}" aria-pressed="false">${money(v)}</button>`).join("")}</div>
             <div class="you-cap">
-              <span class="grow"><b class="t-headline">Cap</b><span class="t-foot t-2 you-line"></span></span>
+              <span class="grow"><b class="t-headline">Budget</b><span class="t-foot t-2 you-line"></span></span>
               <span class="n-m num you-capn"></span>
             </div>
-            <p class="t-foot t-2 you-help">Cap: usual minus savings.</p>
+            <p class="t-foot t-2 you-help">Budget: usual week minus savings.${budget().scope === "all" ? (budget().flex ? " Bills not included." : " All money out, not investing.") : " Food and getting around."}</p>
           </div>
           <p class="vh" role="status" aria-live="polite" data-save-status></p>
         </section>
@@ -683,7 +776,7 @@
         minus.disabled = save <= 0; plus.disabled = save + 5 > c.max;
         body.querySelectorAll(".you-presets .chip").forEach(b => { b.setAttribute("aria-pressed", String(+b.dataset.v === save)); b.disabled = +b.dataset.v > c.max; });
         if (bump) animate(capN, [{ scale: .94, opacity: .6 }, { scale: 1, opacity: 1 }], { preset: "snappy" });
-        if (announce) { clearTimeout(statusTimer); statusTimer = setTimeout(() => { status.textContent = `Saving ${money(save)} a week. Cap ${money(c.cap)}.`; }, 250); }
+        if (announce) { clearTimeout(statusTimer); statusTimer = setTimeout(() => { status.textContent = `Saving ${money(save)} a week. Budget ${money(c.cap)}.`; }, 250); }
       };
       const change = v => {
         save = Math.max(0, Math.min(capParts(save).max, v)); haptic(); syncSave(true, true);
@@ -812,7 +905,7 @@
   // ---------- Notifications (native iOS app only; scheduled locally, no server) ----------
   const notify = {
     available: !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.notify),
-    // opts: { sunday: true (Sun 6pm recap), daily: true (noon tag prompt) }
+    // opts: { sunday: true (Sun 6 PM, plan next week), daily: true (8:30 AM, today's number) }
     enable(opts = { sunday: true, daily: false }) { if (notify.available) window.webkit.messageHandlers.notify.postMessage(Object.assign({ action: "schedule" }, opts)); store.set("notify", opts); },
     disable() { if (notify.available) window.webkit.messageHandlers.notify.postMessage({ action: "cancel" }); store.set("notify", null); },
     state: () => store.get("notify")
@@ -825,9 +918,9 @@
     logo, brandMark, notify, privateData,
     charges, dayOf, swaps, isRideApp, rideAppAllowed, displayMerchant, isReal, allReal, badge, kindOf, kindIcon, kindLabel, icon, spring, springs, animate, haptic, countUp, money, el, esc, store,
     sheet, sheetActions, sheetBack, focusTitle, toast, setSub, navAction, radios,
-    profile: () => active, setProfile, profiles, setSave, capOf, capParts, capLine,
+    profile: () => active, setProfile, profiles, setSave, budget, capOf, capParts, capLine, planStatus, nativePost, reminders: REMINDERS,
     facts: () => profileData().facts, questions: QUESTIONS, answers, setAnswer,
-    weekDays, weekLabel, weekName, weekIsPast, weekKey, todayLabel, dailyPlan,
+    weekDays, weekLabel, weekName, weekIsPast, weekIsOld, weekKey, todayLabel, dailyPlan,
     openYou: section => { closeSheets(); return youSheet(section); },
     go: t => go(t), open: id => open(id), current: () => current,
     reduced: rmq.matches
@@ -893,7 +986,7 @@
     // Fine print: live "you" is real card data, so no prototype or sample wording about it.
     const fine = document.querySelector("[data-fine]"), you = D0.profiles.you;
     if (fine) fine.textContent = you.live
-      ? `You: your card data, ${you.blurb.replace(/^Your card, s/, "s")}. Meal plan and Weekend are sample students.`
+      ? `You: your bank data, ${you.blurb.replace(/^Your bank, s/, "s")}. Meal plan and Weekend are sample students.`
       : "Prototype. You: real card history, sample week. Meal plan and Weekend: sample students.";
     const tabIndex = id => TABS.findIndex(t => t.id === id);
     features.slice().sort((a, b) => (tabIndex(a.tab) - tabIndex(b.tab)) || ((a.order || 0) - (b.order || 0))).forEach(f => {
@@ -934,6 +1027,35 @@
     });
   }
 
+  // ---------- Keep his place across a data reload (cloud.js saves it right before reloading) ----------
+  function restorePlace() {
+    let p = null;
+    try { p = JSON.parse(sessionStorage.getItem("swapPlace") || "null"); sessionStorage.removeItem("swapPlace"); } catch (e) {}
+    if (!p || Date.now() - (p.at || 0) > 60e3 || !views[p.tab]) return;
+    if (p.tab !== current) go(p.tab);
+    const v = views[p.tab];
+    v.scrollTop = p.top || 0;
+    requestAnimationFrame(() => { v.scrollTop = p.top || 0; syncScroll(true); });
+  }
+  // ---------- A new day: redraw (the daily plan reads the phone's date) ----------
+  // The iPhone keeps the page alive in the background, so check on return, on pageshow, and once a
+  // minute while visible. Waits while a sheet or the setup cover is open.
+  function watchDay() {
+    let shown = iso(new Date()), pending = false;
+    const check = () => {
+      if (iso(new Date()) === shown) return;
+      if (openSheets.length || document.querySelector(".ob")) { pending = true; return; }
+      shown = iso(new Date()); pending = false;
+      syncProfileUI();
+      features.forEach(f => { if (!f.profileAware) renderFeature(f); });
+      document.dispatchEvent(new CustomEvent("swap:day", { detail: shown }));
+    };
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") check(); });
+    addEventListener("pageshow", check);
+    addEventListener("swap:sheets-closed", () => { if (pending) check(); });
+    setInterval(() => { if (document.visibilityState === "visible") check(); }, 60e3);
+  }
+
   // ---------- Boot ----------
   window.Swap = {
     feature(def) { features.push(def); },
@@ -952,6 +1074,8 @@
       syncProfileUI();
       fitDevice(); addEventListener("resize", fitDevice);
       go("week");
+      restorePlace();
+      watchDay();
       // Optional boot(api) hook for features with no tab slot (e.g. onboard opens itself on first launch).
       features.forEach(f => { if (typeof f.boot === "function") { try { f.boot(api); } catch (e) { console.error(`[swap] ${f.id} boot failed`, e); } } });
       const deep = new URLSearchParams(location.search).get("open");

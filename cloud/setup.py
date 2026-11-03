@@ -62,10 +62,7 @@ def main():
     values = {
         "PLAID_CLIENT_ID": env.get("PLAID_CLIENT_ID", ""), "PLAID_SECRET": env.get("PLAID_SECRET", ""),
         "PLAID_ENV": env.get("PLAID_ENV", ""), "PLAID_ACCESS_TOKEN": tokens[args.person]["access_token"],
-        "SWAP_APP_TOKEN": app_key, "HIDE_MERCHANTS": env.get("HIDE_MERCHANTS", ""),
-        "SUPPORT_SENDERS": env.get("SUPPORT_SENDERS", ""),
-        "RIDE_APP_NAME": env.get("RIDE_APP_NAME", ""), "RECOMMEND_RIDE_APP": env.get("RECOMMEND_RIDE_APP", ""),
-        "CLUB_MERCHANTS": env.get("CLUB_MERCHANTS", ""),
+        "SWAP_APP_TOKEN": app_key,
     }
     for name, value in values.items():
         if not value:
@@ -75,6 +72,10 @@ def main():
         if r.returncode:
             r = vercel("env", "add", name, "production", value=value)
         print(f"{name}: {'set' if r.returncode == 0 else 'FAILED'}")
+    # The non-secret options (HIDE_MERCHANTS etc.). scripts/morning.sh re-runs this whenever they
+    # change in .env, without making a new app key.
+    import sync_env
+    sync_env.push(env)
 
     project = json.load(open(os.path.join(HERE, ".vercel", "project.json")))
     url = f"https://{project.get('projectName') or args.project}.vercel.app"

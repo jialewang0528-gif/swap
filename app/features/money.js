@@ -1,7 +1,7 @@
 /* Where your money goes.
    Week tab, first. All money out of the bank over the last 10 full weeks (sync.py bank.analysis),
-   ranked by category with a weekly average, then the places that took the most, then a link to the
-   swaps that act on it. Founder's build only (needs window.SwapLive.bank.analysis). */
+   ranked by category with a weekly average (Sent to friends by its net after friends paid back), the
+   places that took the most behind one row, then a link to the swaps that act on it. Founder's build only (needs window.SwapLive.bank.analysis). */
 (function () {
   const FOOD = new Set(["Eating out", "Clubs & bars", "Bodega & liquor", "Coffee & snacks", "Delivery"]);
   const MOVE = new Set(["Rides", "Subway"]);
@@ -22,32 +22,48 @@
       const name = n => typeof api.displayMerchant === "function" ? api.displayMerchant(n) : n;
       const fmt = s => new Date(s + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
       const friendsIn = (A.ins || []).find(x => x.cat === "From friends");
-      const cats = A.cats.filter(c => c.cat !== "Investing" && c.perWeek >= 1);
-      const top = cats.slice(0, 8), rest = cats.slice(8);
+      // Sent to friends ranks by what is left after friends paid back (sync.py friendsNet when present).
+      const sentNet = c => {
+        const fn = A.friendsNet;
+        if (typeof fn === "number") return fn;
+        if (fn && typeof fn.perWeek === "number") return fn.perWeek;
+        if (typeof c.net === "number") return c.net;
+        return friendsIn ? c.perWeek - friendsIn.perWeek : null;
+      };
+      const all = A.cats.filter(c => c.cat !== "Investing" && c.perWeek >= 1).map(c => c.cat === "Sent to friends" && sentNet(c) != null
+        ? Object.assign({}, c, { gross: c.perWeek, perWeek: Math.max(0, Math.round(sentNet(c))), isNet: true }) : c)
+        .sort((a, b) => b.perWeek - a.perWeek);
+      // Top 8, plus any category a swap acts on, so the biggest swap is never hidden in "Everything else".
+      const swapCats = new Set((window.SwapLive.swapOptions || []).map(o => o.cat).filter(Boolean));
+      const top = all.filter((c, i) => i < 8 || swapCats.has(c.cat)), rest = all.filter(c => !top.includes(c) && c.perWeek >= 1);
       const max = Math.max(1, ...top.map(c => c.perWeek));
-      const note = c => c.cat === "Sent to friends" && friendsIn ? `Friends sent back ${money(friendsIn.perWeek)} a week`
-        : c.cat === "Rides" ? "Night rides always OK" : `${c.count} charges`;
+      const foodWk = A.cats.filter(c => FOOD.has(c.cat)).reduce((t, c) => t + c.perWeek, 0);
+      const note = c => c.isNet ? `Sent ${money(c.gross)}, got back ${money(c.gross - c.perWeek)}`
+        : c.cat === "Rides" ? `${c.count} rides` : `${c.count} charges`;
+      const amtText = c => `${c.isNet ? "net " : ""}${money(c.perWeek)}`;
       const restSum = rest.reduce((t, c) => t + c.perWeek, 0);
+      const places = (A.places || []).slice(0, 5);
 
       slot.innerHTML = `
         <h2 class="section-title">Where your money goes <small>${esc(fmt(A.from))} – ${esc(fmt(A.to))}</small></h2>
         <div class="card mo">
           <div class="mo-head">
             <div><span class="t-foot t-3">Out, a week</span><b class="num mo-big">${money(A.outPerWeek)}</b></div>
-            <div class="mo-in"><span class="t-foot t-3">In, a week</span><b class="num">${money(A.inPerWeek)}</b></div>
+            <div class="mo-in"><span class="t-foot t-3">In, a week</span><b class="num">+${money(A.inPerWeek)}</b></div>
           </div>
-          <ol class="mo-list">${top.map((c, i) => `<li class="mo-cat tap-row" data-cat="${esc(c.cat)}" role="button" tabindex="0" aria-label="${esc(c.cat)}, ${money(c.perWeek)} a week. Show charges">
+          ${foodWk ? `<p class="t-foot t-2 mo-food">Food and drinks: <b class="num">${money(foodWk)}</b> a week</p>` : ""}
+          <ol class="mo-list">${top.map((c, i) => `<li class="mo-cat tap-row" data-cat="${esc(c.cat)}" role="button" tabindex="0" aria-label="${esc(c.cat)}, ${c.isNet ? "net " : ""}${money(c.perWeek)} a week, ${esc(note(c))}. Show charges">
               <span class="mo-rank num t-foot t-3" aria-hidden="true">${i + 1}</span>
               <span class="mo-name"><span class="t-sub">${esc(c.cat)}</span><span class="t-foot t-3">${esc(note(c))}</span></span>
               <span class="mo-track" aria-hidden="true"><i class="${tone(c.cat)}" style="width:${Math.max(3, c.perWeek / max * 100)}%"></i></span>
-              <span class="mo-amt num">${money(c.perWeek)}<span class="t-foot t-3">/wk</span></span></li>`).join("")}</ol>
-          ${rest.length ? `<p class="t-foot t-3 mo-rest">Everything else: ${money(restSum)} a week (${esc(rest.map(c => c.cat).join(", "))})</p>` : ""}
-          <h3 class="t-foot mo-h">Biggest places</h3>
-          <div class="list">${(A.places || []).slice(0, 5).map(p => `<div class="row">
+              <span class="mo-amt num">${amtText(c)}<span class="t-foot t-3">/wk</span></span></li>`).join("")}</ol>
+          ${rest.length ? `<p class="t-foot t-3 mo-rest">Everything else: ${money(restSum)} a week (${esc(rest.map(c => c.isNet ? `${c.cat} (net)` : c.cat).join(", "))})</p>` : ""}
+          ${places.length ? `<details class="bk-more mo-more"><summary class="t-sub">Biggest places <span class="t-foot t-3">${places.length}</span>${api.icon("chevronDown", 16, 2.4)}</summary>
+            <div class="bk-more-body"><div class="list">${places.map(p => `<div class="row">
               <span class="grow"><span class="t-sub mo-place">${esc(name(p.name))}</span><span class="t-foot t-3">${esc(p.cat)} · ${p.count} ${p.count === 1 ? "time" : "times"}</span></span>
-              <span class="amt num">${money(p.total)}</span></div>`).join("")}</div>
+              <span class="amt num">${money(p.total)}</span></div>`).join("")}</div></div></details>` : ""}
           <button class="btn primary block mo-act">See swaps for these</button>
-          <p class="t-foot t-3 mo-fine">All money out of your bank except investing, last ${A.weeks} full weeks. Tap a category to see its charges.</p>
+          <p class="t-foot t-3 mo-fine">All money out of your bank except investing, last ${A.weeks} full weeks. Night rides are never a swap. Tap a category to see its charges.</p>
         </div>`;
       // Tap (or Enter / Space) a category row to see every charge in it.
       const openable = (root, range) => root.querySelectorAll("[data-cat]").forEach(r => {

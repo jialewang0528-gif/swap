@@ -149,8 +149,9 @@
 .ag-trow, .ag-swap { min-width: 0; }
 
 /* Daily plan card: day, spent (fill) vs plan (tick), amount. Today in bold. */
-.ag-prow { display: grid; grid-template-columns: 3.4rem minmax(0, 1fr) auto; gap: var(--s-2) var(--s-3); align-items: center; min-height: 30px; }
-.ag-prow + .ag-prow { margin-top: 2px; }
+/* Rows share one set of columns (subgrid), so every bar starts and ends at the same x. */
+.ag-prows { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; column-gap: var(--s-3); row-gap: 2px; }
+.ag-prow { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; min-height: 30px; }
 .ag-prow.on .ag-pday, .ag-prow.on .ag-pamt { font-weight: 700; color: var(--ink); }
 .ag-prow.past .ag-pday { color: var(--ink-2); }
 .ag-pamt { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }

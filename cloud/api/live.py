@@ -3,8 +3,9 @@
 GET /api/live with "Authorization: Bearer <SWAP_APP_TOKEN>" returns the same JSON the Mac's
 sync.py writes to app/private/live.js (minus logos; the phone keeps its bundled ones).
 Everything secret lives in this Vercel project's environment variables, never in code:
-PLAID_CLIENT_ID, PLAID_SECRET, PLAID_ENV, PLAID_ACCESS_TOKEN, SWAP_APP_TOKEN,
-HIDE_MERCHANTS, SUPPORT_SENDERS.
+PLAID_CLIENT_ID, PLAID_SECRET, PLAID_ENV, PLAID_ACCESS_TOKEN, SWAP_APP_TOKEN, plus the non-secret
+options cloud/sync_env.py keeps in step with .env (HIDE_MERCHANTS, CLUB_MERCHANTS, RIDE_APP_NAME,
+RECOMMEND_RIDE_APP, SUPPORT_SENDERS, CATEGORY_OVERRIDES).
 """
 
 import hmac
@@ -16,8 +17,14 @@ from http.server import BaseHTTPRequestHandler
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "_lib"))
 import sync  # noqa: E402  (pull.py, ledger.py, sync.py copied from the Swap repo by deploy.sh)
 
+# Each Plaid call gives up well inside the function's 30 s limit (vercel.json), so a slow bank ends
+# as a clean 502 instead of a platform timeout.
+os.environ.setdefault("PLAID_TIMEOUT", "20")
+
+# Only the app itself may read this cross-origin: the iPhone web view loads from file://, which
+# sends Origin "null", and the local preview server runs on port 8744. URLSession sends no Origin.
+ALLOWED_ORIGINS = {"null", "http://localhost:8744", "http://127.0.0.1:8744"}
 CORS = {
-    "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
     "Access-Control-Allow-Headers": "Authorization",
     "Access-Control-Max-Age": "600",
@@ -27,8 +34,12 @@ CORS = {
 class handler(BaseHTTPRequestHandler):
     def _send(self, status, body=b"", kind="application/json"):
         self.send_response(status)
-        for k, v in CORS.items():
-            self.send_header(k, v)
+        origin = self.headers.get("Origin")
+        if origin in ALLOWED_ORIGINS:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            for k, v in CORS.items():
+                self.send_header(k, v)
+        self.send_header("Vary", "Origin")
         self.send_header("Cache-Control", "no-store")
         if body:
             self.send_header("Content-Type", kind)

@@ -1,13 +1,50 @@
 /* Open a spending category and see every charge in it (founder's build: window.SwapLive.bank.history,
    the last 10 full weeks plus this week). Used by Where your money goes, Whole bank and This week:
      SwapCategory.open(api, "Personal care", { from: "2026-08-24", to: "2026-11-08", title: "Last 10 weeks" })
-   Charges are newest first, grouped by day, money in with a +. */
+   Charges are newest first, grouped by day, money in with a +.
+
+   Also the one transaction row used by By day, Whole bank and this sheet (styles: .tx-* in features/bank.css):
+     SwapCategory.txRow(api, { name, amount, cat, time, pending, tone }, { cents, tag, meta, aria })
+   32px mark, title-cased name, "Category · time · Pending" under it, amount right, money in with a +. */
 (function () {
   const has = () => !!(window.SwapLive && window.SwapLive.bank && Array.isArray(window.SwapLive.bank.history));
+  // Bank category names, one list for every screen.
+  const FOOD = new Set(["Eating out", "Clubs & bars", "Bodega & liquor", "Coffee & snacks", "Delivery"]);
+  const MOVE = new Set(["Rides", "Subway"]);
+  const toneOf = cat => FOOD.has(cat) ? "food" : MOVE.has(cat) ? "move" : "other";
+  // A charge kind (data.js) to its bank category. "drinks" covers two bank categories.
+  const KIND_CAT = { dining: "Eating out", drinks: "Clubs & bars, bodega & liquor", quick: "Coffee & snacks", delivery: "Delivery", ride: "Rides", transit: "Subway" };
+
+  const rideApp = (api, n) => typeof api.isRideApp === "function" ? api.isRideApp(n) : /lower-fare/i.test(String(n || ""));
+  // Bank names, cleaned for reading: the private build's display name, then title case when the bank sent all lowercase.
+  function txName(api, n) {
+    let s = String(typeof api.displayMerchant === "function" ? api.displayMerchant(n) : n || "").trim();
+    if (s && s === s.toLowerCase()) s = s.replace(/(^|[\s.'-])([a-z])/g, (m, a, b) => a + b.toUpperCase());
+    return s.replace(/\bNyu\b/g, "NYU").replace(/\bMta\b/g, "MTA");
+  }
+  const clock = tm => { const [h, m] = String(tm).split(":").map(Number); return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`; };
+  // One 32px mark: the merchant's logo, else a letter tile tinted by food / move / night, else a neutral letter tile.
+  function txMark(api, t) {
+    const n = txName(api, t.name), inn = t.amount < 0, transfer = /^(zelle|venmo)\b/i.test(n);
+    const tone = t.tone || toneOf(t.cat);
+    if (rideApp(api, t.name)) return api.brandMark(null, tone === "night" ? "night" : "move", 32);
+    if (!transfer && api.logo(t.name)) return api.brandMark(t.name, tone === "other" ? "food" : tone, 32);
+    if (!inn && tone !== "other") return api.brandMark(t.name, tone, 32);
+    const ch = n.replace(/^(zelle|venmo)\s+(to|from)\s+/i, "").trim().charAt(0).toUpperCase() || "$";
+    return `<span class="tx-mono${inn ? " in" : ""}" aria-hidden="true">${api.esc(ch)}</span>`;
+  }
+  function txRow(api, t, o = {}) {
+    const { esc, money } = api, inn = t.amount < 0, d = o.cents ? 2 : 0;
+    const meta = [t.cat ? esc(t.cat) : "", t.time ? `<span class="num">${clock(t.time)}</span>` : "", t.pending ? "Pending" : ""].filter(Boolean).join(" · ");
+    const tag = o.tag || "div";
+    return `<${tag} class="tx-row${o.cls ? " " + o.cls : ""}"${o.attrs ? " " + o.attrs : ""}>${txMark(api, t)}
+      <span class="tx-main"><b class="t-sub tx-name">${o.prefix ? `<span class="vh">${esc(o.prefix)}: </span>` : ""}${esc(txName(api, t.name))}</b>${meta || o.meta ? `<span class="tx-meta t-foot">${meta ? `<span class="t-3">${meta}</span>` : ""}${o.meta || ""}</span>` : ""}</span>
+      <span class="tx-amt num${inn ? " in" : ""}">${inn ? "+" + money(-t.amount, d) : money(t.amount, d)}</span></${tag}>`;
+  }
+
   function open(api, cat, opts = {}) {
     if (!has()) return false;
     const { esc, money } = api;
-    const name = n => typeof api.displayMerchant === "function" ? api.displayMerchant(n) : n;
     const from = opts.from || "0000", to = opts.to || "9999";
     const list = window.SwapLive.bank.history.filter(h => h.cat === cat && h.d >= from && h.d <= to);
     const out = list.filter(h => h.amount > 0).reduce((t, h) => t + h.amount, 0);
@@ -24,11 +61,10 @@
           ${!out && !back ? `<p class="t-sub t-3">Nothing here in this period.</p>` : ""}
         </div>
         ${days.map(d => `<h3 class="section-title cg-day">${esc(day(d))}</h3>
-          <div class="card cg-list"><div class="list">${list.filter(h => h.d === d).map(h => `<div class="row">
-            <span class="grow"><span class="t-sub cg-name">${esc(name(h.name))}</span>${h.pending ? `<span class="t-foot t-3">Pending</span>` : ""}</span>
-            <span class="amt num">${h.amount < 0 ? `<span class="cg-in">+${money(-h.amount, 2)}</span>` : money(h.amount, 2)}</span></div>`).join("")}</div></div>`).join("")}`;
+          <div class="card cg-list"><div class="list">${list.filter(h => h.d === d).map(h =>
+            txRow(api, { name: h.name, amount: h.amount, pending: h.pending, time: h.time, tone: toneOf(cat) }, { cents: true })).join("")}</div></div>`).join("")}`;
     }, { label: cat });
     return true;
   }
-  window.SwapCategory = { open, available: has };
+  window.SwapCategory = { open, available: has, txRow, txMark, txName, toneOf, KIND_CAT, FOOD, MOVE };
 })();

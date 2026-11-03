@@ -1,9 +1,11 @@
 /* Wallet tab.
    Subscriptions first: one recurring monthly total (subscriptions + memberships), then every row.
-   Rows can be renamed inline (store "subNames") and hidden from the total by swiping left or with
-   the Hide button (store "hiddenSubs"), with an Undo toast. Then the passes the student already
-   pays for, as a Wallet-style stack: meal plan (only with a plan), DashPass / Uber One, and the
-   OMNY fare cap. Uber One for Students shows only for profiles that ride a lot (all ride apps count).
+   Rows can be renamed inline (store "subNames"). Swipe a row left (or focus its action) to mark it
+   cancelled: that writes store "cancelledSubs", the same list as the Swaps tab's "Cancelled any
+   subscriptions?" checklist, so the row moves to Ended and its "Cancel X" swap leaves the goal.
+   Then the passes the student already pays for, as a Wallet-style stack: meal plan (only with a
+   plan), DashPass / Uber One, and the OMNY fare cap. Uber One for Students shows only when the
+   week has 4 or more Uber rides (it discounts Uber rides only).
    Meal swipe pace (window.SwapWallet.mealPace, mirror it in Chat):
      weeksElapsed = max(1, round((today - move.date) / 7 days)), or 10 with no move date
      using  = round(swipesUsed / weeksElapsed)   "Using ~N a week"
@@ -11,6 +13,7 @@
    Tap or Enter/Space on a card's header lifts it to the front (the one signature motion);
    again, or Escape, puts it back. Collapsed bodies are hidden, so screen readers skip them. */
 (function () {
+const quiet = { on: false };
 Swap.feature({
   id: "wallet",
   title: "Wallet",
@@ -29,8 +32,9 @@ Swap.feature({
       dispose = draw(slot, api);
     }
     build();
-    // A subscription marked "Cancelled" on the Swaps tab moves to Ended here right away.
-    const offGone = api.store.on("cancelledSubs", () => { if (alive) build(); });
+    // A subscription marked cancelled on the Swaps tab moves to Ended here right away. Our own
+    // writes redraw just the list (quiet), so focus stays put.
+    const offGone = api.store.on("cancelledSubs", () => { if (alive && !quiet.on) build(); });
     return () => { alive = false; document.removeEventListener("swap:facts", onFacts); offGone && offGone(); dispose(); };
   }
 });
@@ -48,7 +52,9 @@ function draw(slot, api) {
   const mem = name => (D.memberships || []).find(m => m.name === name) || null;
   const dp = mem("DashPass"), uo = mem("Uber One");
   const rides = ch.filter(c => c.kind === "ride");
-  const ridesALot = rides.length >= 4 || (D.move && D.move.ridesPerWeekAfter >= 4);
+  // Uber One discounts Uber rides only: never count the lower-fare app, Lyft or a cab toward it.
+  const uberRides = rides.filter(c => /\buber\b/i.test(c.merchant || "") && !api.isRideApp(c.merchant));
+  const weekWord = (typeof api.weekName === "function" ? api.weekName() : "This week").toLowerCase();   // "last week" on live data
   const transit = ch.filter(c => c.kind === "transit");
   const SUB = D.subway || { fare: 3, weeklyCap: 35 };
   const PAID_TAPS = Math.ceil(SUB.weeklyCap / SUB.fare);                   // 12: the 12th tap reaches $35
@@ -95,12 +101,12 @@ function draw(slot, api) {
     const pt = d => { const r = (d - 90) * Math.PI / 180; return `${(C + R * Math.cos(r)).toFixed(2)} ${(C + R * Math.sin(r)).toFixed(2)}`; };
     let s = "";
     for (let i = 0; i < PAID_TAPS; i++) s += `<path class="${i < on ? "on" : ""}" d="M${pt(i * seg + gap / 2)} A${R} ${R} 0 0 1 ${pt((i + 1) * seg - gap / 2)}"/>`;
-    return `<div class="wl-ring" role="img" aria-label="${taps} of ${PAID_TAPS} paid taps this week"><svg viewBox="0 0 96 96" aria-hidden="true">${s}</svg>
+    return `<div class="wl-ring" role="img" aria-label="${taps} of ${PAID_TAPS} paid taps ${weekWord}"><svg viewBox="0 0 96 96" aria-hidden="true">${s}</svg>
       <span class="wl-ring-c" aria-hidden="true"><span class="n-m">${taps}</span><span class="t-foot t-2">of ${PAID_TAPS}</span></span></div>`;
   })();
   CARDS.push({ id: "omny", name: "OMNY fare cap", brand: "OMNY", tone: "move", kind: "transit", face: `${taps} of ${PAID_TAPS} taps`,
     body: `<div class="wl-omny">${ring}<div class="list">${row("Fare", money(SUB.fare))}${row("Cap", money(SUB.weeklyCap))}${row("Free after", `${PAID_TAPS} taps`)}</div></div>
-      <div class="list">${row("Taps this week", `${taps} (${money(taps * SUB.fare)})`)}
+      <div class="list">${row(`Taps ${weekWord}`, `${taps} (${money(taps * SUB.fare)})`)}
         ${isYou && SUB.tapsPerWeek ? row("Usual", `~${one(SUB.tapsPerWeek)} a week`) : ""}
         ${row("Resets", "7 days after first tap")}</div>` });
 
@@ -112,16 +118,16 @@ function draw(slot, api) {
   </div>`);
   root.prepend(subsHost);
 
-  // Uber One for Students: for profiles that ride a lot and don't pay for it. Every ride app counts
-  // toward whether a ride membership pays off, not only Uber-branded rides.
-  if (ridesALot && !uo && rides.length) {
-    const rideSpend = rides.reduce((s, c) => s + c.amount, 0);
+  // Uber One for Students: only when the week has 4+ Uber rides and no Uber One yet. The badge
+  // comes from core (none on live data); the week word matches the charges' week.
+  if (!uo && uberRides.length >= 4) {
+    const uberSpend = uberRides.reduce((s, c) => s + c.amount, 0);
     root.appendChild(el(`<div class="wl-opts">
-      <h2 class="section-title" id="wl-opt-h">Options <span class="sample">Sample</span></h2>
+      <h2 class="section-title" id="wl-opt-h">Options ${typeof api.badge === "function" ? api.badge("memberships") : ""}</h2>
       <section class="card wl-opt" aria-labelledby="wl-opt-h">
         <div class="wl-opt-row">${api.brandMark("Uber One", "move", 40)}
           <div class="grow"><p class="t-headline">Uber One for Students</p>
-            <p class="t-sub t-2">${rides.length} ${rides.length === 1 ? "ride" : "rides"} this week · ${money(rideSpend)}</p></div>
+            <p class="t-sub t-2">Uber rides ${weekWord}: <span class="num">${uberRides.length}</span> · <span class="num">${money(uberSpend)}</span></p></div>
           <p class="wl-opt-price"><span class="n-m">${money(4.99, 2)}</span> <span class="t-foot t-2">a month</span></p></div>
         <p class="t-foot t-3 wl-p">Student ID needed.</p>
       </section></div>`));
@@ -229,7 +235,7 @@ function draw(slot, api) {
 
 // ---------- Subscriptions ----------
 // Recurring charges. "you" reads the on-device private list when it exists (REAL); otherwise a short
-// SAMPLE list per profile. Rows can be hidden (store "hiddenSubs", per profile) for demos.
+// SAMPLE list per profile. Marking one cancelled writes store "cancelledSubs" (names), shared with Swaps.
 const SAMPLE_SUBS = {
   you: [
     { name: "DashPass", amount: 9.99, freq: "monthly", since: "2026-10", active: true },
@@ -260,103 +266,84 @@ function subscriptions(host, api) {
   const D = api.data;
   const priv = api.privateData();
   const isReal = api.profile() === "you" && !!(priv && Array.isArray(priv.subscriptions) && priv.subscriptions.length);
-  // Subscriptions marked "Cancelled" on the Swaps tab show as ended here.
-  const gone = new Set(store.get("cancelledSubs") || []);
-  const src = (isReal ? priv.subscriptions : (SAMPLE_SUBS[api.profile()] || [])).map(s => gone.has(s.name) ? Object.assign({}, s, { active: false, until: s.until || "2026-11" }) : s);
+  const base = (isReal ? priv.subscriptions : (SAMPLE_SUBS[api.profile()] || [])).slice();
   // Memberships the profile pays for count in the same monthly total; add any the list lacks.
   (D.memberships || []).forEach(m => {
-    if (!src.some(s => s.active && (s.name === m.name || (s.brand && new RegExp(s.brand, "i").test(m.name)))))
-      src.push({ name: m.name, amount: m.price, freq: m.period === "year" ? "yearly" : "monthly", active: true });
+    if (!base.some(s => s.active && (s.name === m.name || (s.brand && new RegExp(s.brand, "i").test(m.name)))))
+      base.push({ name: m.name, amount: m.price, freq: m.period === "year" ? "yearly" : "monthly", active: true });
   });
-  if (!src.length) return () => {};
+  if (!base.length) return () => {};
   const slug = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-");
   const seen = {};
-  const subs = src.map(s => {
+  const rows = base.map(s => {
     let id = s.id || slug(`${s.name}-${s.amount}-${s.since || ""}-${s.until || ""}`);
     seen[id] = (seen[id] || 0) + 1; if (seen[id] > 1) id += "-" + seen[id];
     const month = s.amount * (PER_MONTH[s.freq] != null ? PER_MONTH[s.freq] : 1);
     return Object.assign({}, s, { id, month, year: month * 12 });
   });
+  const goneSet = () => new Set(store.get("cancelledSubs") || []);
+  const setGone = names => { quiet.on = true; try { store.set("cancelledSubs", [...new Set(names)]); } finally { quiet.on = false; } };
+  // Older builds hid rows by id (store "hiddenSubs"): fold them into the one cancelled list, once.
+  const hid = store.get("hiddenSubs");
+  if (Array.isArray(hid) && hid.length) {
+    const names = rows.filter(s => hid.includes(s.id) && s.active).map(s => s.name);
+    store.set("hiddenSubs", []);
+    if (names.length) setGone([...goneSet(), ...names]);
+  }
+  // Rows as they stand now: marked ones show as ended this month.
+  const subsNow = () => { const g = goneSet(); return rows.map(s => s.active && g.has(s.name) ? Object.assign({}, s, { active: false, marked: true }) : s); };
+  const totalNow = () => subsNow().filter(s => s.active).reduce((t, s) => t + s.month, 0);
   const mon = ym => { if (!ym) return ""; const [y, m] = ym.split("-").map(Number); return new Date(Date.UTC(y, m - 1, 15)).toLocaleDateString("en-US", { month: "short", timeZone: "UTC" }) + (y !== 2026 ? ` ’${String(y).slice(2)}` : ""); };
-  const when = s => s.active ? (s.since ? `Since ${mon(s.since)}` : "Active") : [mon(s.since), mon(s.until)].filter(Boolean).join(" – ");
+  const when = s => s.marked ? "Marked cancelled" : s.active ? (s.since ? `Since ${mon(s.since)}` : "Active") : [mon(s.since), mon(s.until)].filter(Boolean).join(" – ");
   const nameOf = s => ((store.get("subNames") || {})[s.id] || s.name);
   const mark = s => api.logo(s.name)
     ? api.brandMark(s.name, "food", 36)
     : `<span class="brandmark generic wl-mono" style="--bm:36px" aria-hidden="true">${esc(String(s.name).trim().charAt(0).toUpperCase())}</span>`;
   const badge = typeof api.badge === "function" ? (isReal && !api.data.live ? `<span class="real">Real</span>` : api.badge("memberships"))
     : isReal || (api.profile() === "you" && api.data.live) ? `<span class="real">Real</span>` : `<span class="sample">Sample</span>`;
-  let showHidden = false, openEnded = false, editing = null, undo = null;
+  let openEnded = false, editing = null;
 
-  // Undo toast: floats above the tab bar, outside the scrolling view.
-  const appEl = host.closest("#app") || document.body;
-  const undoEl = el(`<div class="wl-undo glass strong" hidden><p class="t-sub" role="status" aria-live="polite"></p><button class="wl-undo-btn">Undo</button></div>`);
-  appEl.appendChild(undoEl);
-  let undoTimer = null;
-  const hideUndo = () => { clearTimeout(undoTimer); undoEl.hidden = true; undo = null; };
-  function showUndo(text, fn) {
-    clearTimeout(undoTimer);
-    undo = fn;
-    const msg = undoEl.querySelector("p");
-    msg.textContent = "";
-    undoEl.hidden = false;
-    setTimeout(() => { msg.textContent = text; }, 40);
-    undoTimer = setTimeout(() => { if (!undoEl.contains(document.activeElement)) hideUndo(); else undoTimer = setTimeout(hideUndo, 4000); }, 6000);
-  }
-  undoEl.querySelector(".wl-undo-btn").addEventListener("click", () => { const f = undo; hideUndo(); f && f(); });
-
-  const hiddenSet = () => new Set(store.get("hiddenSubs") || []);
-  const totalNow = () => { const h = hiddenSet(); return subs.filter(s => s.active && !h.has(s.id)).reduce((t, s) => t + s.month, 0); };
-  function setHidden(id, on) {
-    const set = hiddenSet();
-    if (on) set.add(id); else set.delete(id);
-    store.set("hiddenSubs", [...set]);
-  }
-
-  // focus: { id, part: "name" } | { part: "toggle" } | { part: "heading" }
+  // focus: { id, part: "name" | "still" } | { part: "heading" | "ended" }
   function draw(focus) {
-    const hidden = hiddenSet();
-    const vis = s => showHidden || !hidden.has(s.id);
-    const active = subs.filter(s => s.active && vis(s)).sort((a, b) => b.month - a.month);
-    const ended = subs.filter(s => !s.active && vis(s));
-    const counted = subs.filter(s => s.active && !hidden.has(s.id));
-    const nHidden = subs.filter(s => hidden.has(s.id)).length;
-    const total = counted.reduce((t, s) => t + s.month, 0);
-    const foodRide = counted.filter(s => FOOD_RIDE.test(`${s.name} ${s.brand || ""}`)).reduce((t, s) => t + s.month, 0);
+    const subs = subsNow();
+    const active = subs.filter(s => s.active).sort((a, b) => b.month - a.month);
+    const ended = subs.filter(s => !s.active);
+    const total = active.reduce((t, s) => t + s.month, 0);
+    const foodRide = active.filter(s => FOOD_RIDE.test(`${s.name} ${s.brand || ""}`)).reduce((t, s) => t + s.month, 0);
     // Rows that share a name (five "Apple" charges) get a rename hint on the first one.
     const names = {}; active.forEach(s => { const n = nameOf(s); names[n] = (names[n] || 0) + 1; });
     let hinted = false;
     const row = s => {
-      const h = hidden.has(s.id), name = nameOf(s);
+      const name = nameOf(s);
       const dup = names[name] > 1 && !(store.get("subNames") || {})[s.id];
       const hint = dup && !hinted && s.active ? (hinted = true, " · Tap to rename") : "";
       const label = `${name}, ${money(s.month, 2)} a month`;
       const nameNode = editing === s.id
         ? `<input class="wl-rename t-sub" value="${esc(name)}" maxlength="32" enterkeyhint="done" autocomplete="off" aria-label="Name for ${esc(label)}">`
         : `<button class="wl-name-btn t-sub" aria-label="${esc(label)}. Rename">${esc(name)}</button>`;
-      return `<li class="wl-sub${h ? " is-hidden" : ""}" data-id="${esc(s.id)}">
+      return `<li class="wl-sub${s.marked ? " is-marked" : ""}" data-id="${esc(s.id)}">
         <div class="wl-sub-fg">${mark(s)}
           <div class="wl-sub-main">
-            <span class="grow">${nameNode}<span class="t-foot t-2">${h ? `<b class="wl-hidtag">Hidden</b> · ` : ""}${esc(when(s))}${hint}</span></span>
-            <span class="wl-sub-amt"><b class="num">${money(s.month, 2)}<span class="t-foot t-2">/mo</span></b><span class="t-foot t-3 num">${money(s.year, 2)}/yr</span></span>
-            ${h ? `<button class="btn tint small wl-unhide" aria-label="Unhide ${esc(label)}">Unhide</button>` : ""}
+            <span class="grow">${nameNode}<span class="t-foot t-2">${esc(when(s))}${hint}</span></span>
+            <span class="wl-sub-amt"><b class="num">${money(s.month, 2)}<span class="t-foot t-2" aria-hidden="true">/mo</span><span class="vh"> a month</span></b><span class="t-foot t-3 num"><span aria-hidden="true">${money(s.year, 2)}/yr</span><span class="vh">${money(s.year, 2)} a year</span></span></span>
+            ${s.marked ? `<button class="btn tint small wl-still" aria-label="Still paying for ${esc(name)}">Still paying</button>` : ""}
           </div>
         </div>
-        ${h ? "" : `<button class="wl-hide-act t-sub" aria-label="Hide ${esc(label)}">Hide</button>`}</li>`;
+        ${s.active ? `<button class="wl-gone-act t-foot" aria-label="Mark ${esc(label)} cancelled">Mark cancelled</button>` : ""}</li>`;
     };
     host.replaceChildren(el(`<section class="wl-subs" aria-labelledby="wl-subs-h">
       <div class="card wl-subs-card">
         <div class="wl-subs-sum">
           <div class="wl-subs-top"><h2 class="t-headline" id="wl-subs-h" tabindex="-1">Subscriptions</h2>${badge}</div>
           <p class="wl-hero"><span class="n-l">${money(total, 2)}</span> <span class="t-sub t-2">a month</span></p>
-          <p class="t-sub t-2"><b class="num">${money(total * 12, 0)}</b> a year · <b class="num">${counted.length}</b> active</p>
+          <p class="t-sub t-2"><b class="num">${money(total * 12, 0)}</b> a year · <b class="num">${active.length}</b> active</p>
           ${foodRide > 0 && total - foodRide > 0 ? `<p class="t-foot t-2">Food and rides <b class="num">${money(foodRide, 2)}</b> · Other <b class="num">${money(total - foodRide, 2)}</b></p>` : ""}
-          ${nHidden ? `<button class="wl-showhidden t-foot" aria-expanded="${showHidden}">${nHidden} hidden · ${showHidden ? "Hide again" : "Show"}</button>` : ""}
         </div>
         ${active.length ? `<ul class="wl-sublist" aria-label="Active">${active.map(row).join("")}</ul>` : ""}
         ${ended.length ? `<div class="wl-ended">
           <button class="wl-ended-btn t-sub" aria-expanded="${openEnded}" aria-controls="wl-ended-l" aria-label="Ended subscriptions, ${ended.length}"><span>Ended</span><span class="t-2">${ended.length}</span>${api.icon("chevronDown", 16, 2.2)}</button>
           <ul class="wl-sublist" id="wl-ended-l" aria-label="Ended"${openEnded ? "" : " hidden"}>${ended.map(row).join("")}</ul></div>` : ""}
-        ${active.length ? `<p class="t-foot t-3 wl-swipehint">Swipe a row left to hide it.</p>` : ""}
+        ${active.length ? `<p class="t-foot t-3 wl-swipehint">Swipe a row left if you cancelled it.</p>` : ""}
       </div></section>`));
     const sec = host.firstElementChild;
 
@@ -372,7 +359,7 @@ function subscriptions(host, api) {
       const finish = keep => {
         if (done) return; done = true;
         const v = inp.value.trim(), names = Object.assign({}, store.get("subNames") || {});
-        const orig = subs.find(s => s.id === id).name;
+        const orig = rows.find(s => s.id === id).name;
         if (keep) { if (v && v !== orig) names[id] = v; else delete names[id]; store.set("subNames", names); }
         editing = null; draw({ id, part: "name" });
         if (keep && v && v !== orig) api.toast(`Renamed ${v}`);
@@ -382,15 +369,15 @@ function subscriptions(host, api) {
       requestAnimationFrame(() => { inp.focus({ preventScroll: true }); inp.select(); });
     }
 
-    // Hide (button behind the row, revealed by a left swipe or keyboard focus) and Unhide
-    sec.querySelectorAll(".wl-hide-act").forEach(b => b.addEventListener("click", () => hideRow(b.closest(".wl-sub"))));
-    sec.querySelectorAll(".wl-unhide").forEach(b => b.addEventListener("click", () => {
-      const id = b.closest(".wl-sub").dataset.id, s = subs.find(x => x.id === id);
-      haptic(); setHidden(id, false); hideUndo();
+    // Mark cancelled (the action behind the row, revealed by a left swipe or keyboard focus) and Still paying
+    sec.querySelectorAll(".wl-gone-act").forEach(b => b.addEventListener("click", () => markRow(b.closest(".wl-sub"))));
+    sec.querySelectorAll(".wl-still").forEach(b => b.addEventListener("click", () => {
+      const id = b.closest(".wl-sub").dataset.id, s = rows.find(x => x.id === id);
+      haptic(); setGone([...goneSet()].filter(n => n !== s.name));
       draw({ id, part: "name" });
       api.toast(`${nameOf(s)} counted. Now ${money(totalNow(), 2)} a month.`);
     }));
-    sec.querySelectorAll(".wl-sub:not(.is-hidden) .wl-sub-fg").forEach(bindSwipe);
+    sec.querySelectorAll(".wl-sub:not(.is-marked) .wl-sub-fg").forEach(bindSwipe);
 
     const eb = sec.querySelector(".wl-ended-btn");
     eb && eb.addEventListener("click", () => {
@@ -398,31 +385,29 @@ function subscriptions(host, api) {
       eb.setAttribute("aria-expanded", String(openEnded));
       sec.querySelector("#wl-ended-l").hidden = !openEnded;
     });
-    const sh = sec.querySelector(".wl-showhidden");
-    sh && sh.addEventListener("click", () => { showHidden = !showHidden; haptic(); draw({ part: "toggle" }); });
 
     if (focus) {
-      const t = focus.part === "name" ? sec.querySelector(`.wl-sub[data-id="${focus.id}"] .wl-name-btn`)
-        : focus.part === "toggle" ? sec.querySelector(".wl-showhidden") : null;
-      (t || sec.querySelector(".wl-showhidden") || sec.querySelector("h2")).focus({ preventScroll: true });
+      const t = focus.id ? sec.querySelector(`.wl-sub[data-id="${CSS.escape(focus.id)}"] ${focus.part === "still" ? ".wl-still" : ".wl-name-btn"}`)
+        : focus.part === "ended" ? sec.querySelector(".wl-ended-btn") : null;
+      (t || sec.querySelector("h2")).focus({ preventScroll: true });
     }
   }
 
-  function hideRow(li) {
-    const id = li.dataset.id, s = subs.find(x => x.id === id);
+  function markRow(li) {
+    const id = li.dataset.id, s = rows.find(x => x.id === id);
     const hadFocus = host.contains(document.activeElement);
-    // Next row to land on: the one below, else above, else the "N hidden" line.
+    // Next row to land on: the one below, else above, else the Ended toggle.
     const sib = [li.nextElementSibling, li.previousElementSibling].find(n => n && n.classList.contains("wl-sub"));
     haptic();
-    setHidden(id, true);
-    draw(hadFocus ? (sib && !showHidden ? { id: sib.dataset.id, part: "name" } : showHidden ? { id, part: "name" } : { part: "toggle" }) : null);
-    showUndo(`Hid ${nameOf(s)}. Now ${money(totalNow(), 2)}/mo.`, () => {
-      setHidden(id, false);
-      draw({ id, part: "name" });
-    });
+    const before = [...goneSet()];
+    setGone(before.concat(s.name));
+    draw(hadFocus ? (sib ? { id: sib.dataset.id, part: "name" } : { part: "ended" }) : null);
+    api.toast(`${nameOf(s)} marked cancelled. Now ${money(totalNow(), 2)}/mo.`, "check", { action: { label: "Undo", onClick: () => {
+      setGone(before); draw({ id, part: "name" });
+    } } });
   }
 
-  // Swipe left on a row: past 40% hides it, past 56px leaves the Hide button showing.
+  // Swipe left on a row: past 40% marks it cancelled, past 56px leaves the action showing.
   let swiped = false, openFg = null;
   const ACT = 88;
   function closeOpen(except) {
@@ -456,7 +441,7 @@ function subscriptions(host, api) {
       fg.classList.remove("dragging");
       if (!gg.drag) return;
       const w = fg.offsetWidth, li = fg.closest(".wl-sub");
-      if (e.type !== "pointercancel" && -gg.dx > w * .4) { fg.style.translate = `${-w}px 0`; setTimeout(() => hideRow(li), api.reduced ? 0 : 140); }
+      if (e.type !== "pointercancel" && -gg.dx > w * .4) { fg.style.translate = `${-w}px 0`; setTimeout(() => markRow(li), api.reduced ? 0 : 140); }
       else if (-gg.dx > 56) { fg.style.translate = `${-ACT}px 0`; li.classList.add("is-open"); openFg = fg; haptic(); }
       else { fg.style.translate = ""; li.classList.remove("is-open"); if (openFg === fg) openFg = null; }
       setTimeout(() => { swiped = false; }, 50);
@@ -468,7 +453,7 @@ function subscriptions(host, api) {
   document.addEventListener("pointerdown", onDocDown, true);
 
   draw();
-  return () => { hideUndo(); undoEl.remove(); document.removeEventListener("pointerdown", onDocDown, true); };
+  return () => { document.removeEventListener("pointerdown", onDocDown, true); };
 }
 
 // Meal swipe pace, one formula for every screen (Chat mirrors it).

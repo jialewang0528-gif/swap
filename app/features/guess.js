@@ -1,11 +1,16 @@
 /* Guess your week.
-   Week tab hero: the cap (with its one-line formula), the usual week and a status line. The week
+   Week tab hero: the weekly budget (with its one-line formula), the usual week and a status line.
+   On the live build (whole-bank budget on the Today card) this hero is a food + rides recap only:
+   no budget row, just food + rides against its usual. The week
    total stays hidden until the student guesses it. Flow (one sheet): guess on a dial, reveal with
    a digit roll (the Week tab's one signature motion), print a receipt, share a story-size image
    that shows a percent, never dollars. Works for every profile through api.data / api.charges(). */
 (function () {
-  // The lower-fare ride app (shown as Lower-fare app on the private build) is never a swap or a logo pick.
-  const rideApp = (api, name) => typeof api.isRideApp === "function" ? api.isRideApp(name) : /lower-fare|rideapp/i.test(String(name || ""));
+  // The lower-fare ride app (shown under its own name on the private build) is never a swap or a logo pick.
+  const rideApp = (api, name) => typeof api.isRideApp === "function" ? api.isRideApp(name) : /lower-fare/i.test(String(name || ""));
+  // Live build: the weekly budget covers all flexible spending and lives on the Today card, so this
+  // card never names a budget or cap; it compares food + rides with their usual week.
+  const recapOnly = api => typeof api.budget === "function" && api.budget().scope === "all";
   const UNIT = { week: "a week", order: "an order", meal: "a meal", ride: "a ride", month: "a month" };
 
   // This week's charges by line. Night rides get their own protected line.
@@ -28,7 +33,7 @@
     return list.find(s => s.id === id) || (info && info.id === id ? info : null) || list[0] || null;
   }
 
-  // "$600 usual − $100 save − $10 owed". Owed only when there is one.
+  // "$600 usual week − $100 save − $10 owed". Owed only when there is one.
   const capLine = (api, D) => {
     if (typeof api.capLine === "function") return api.capLine();
     const t = D.thisWeek, m = api.money, owed = t.payback && t.payback.perWeek;
@@ -64,10 +69,10 @@
     sheet((body, close) => {
       const D = api.data;
       const node = el(`<div class="gw-save">
-        <p class="t-sub t-2 gw-save-sub">Cap is your usual minus this.</p>
+        <p class="t-sub t-2 gw-save-sub">Budget is your usual week minus this.</p>
         <div class="gw-save-opts" role="radiogroup" aria-label="Weekly save">${PRESETS.map(v =>
           `<button class="chip" role="radio" aria-checked="${v === D.thisWeek.saveTarget}" data-v="${v}">${money(v)}</button>`).join("")}</div>
-        <div class="list"><div class="row"><span class="grow t-sub">Cap</span><span class="amt gw-save-cap" aria-live="polite">${money(D.thisWeek.cap)}</span></div></div>
+        <div class="list"><div class="row"><span class="grow t-sub">Budget</span><span class="amt gw-save-cap" aria-live="polite">${money(api.capOf())}</span></div></div>
       </div>`);
       body.appendChild(node);
       const opts = [...node.querySelectorAll("[data-v]")];
@@ -75,9 +80,9 @@
         const t = api.data.thisWeek;
         opts.forEach(o => { const on = +o.dataset.v === t.saveTarget; o.setAttribute("aria-checked", String(on)); o.tabIndex = on ? 0 : -1; });
         if (!opts.some(o => o.tabIndex === 0)) opts[0].tabIndex = 0;
-        node.querySelector(".gw-save-cap").textContent = money(t.cap);
+        node.querySelector(".gw-save-cap").textContent = money(api.capOf());
       };
-      const pick = o => { haptic(); const cap = api.setSave(+o.dataset.v); sync(); o.focus(); toast(`Cap ${money(cap)} a week`); };
+      const pick = o => { haptic(); const cap = api.setSave(+o.dataset.v); sync(); o.focus(); toast(`Budget ${money(cap)} a week`); };
       opts.forEach(o => o.addEventListener("click", () => pick(o)));
       node.querySelector(".gw-save-opts").addEventListener("keydown", e => {
         const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
@@ -87,7 +92,6 @@
         pick(opts[(i + d + opts.length) % opts.length]);
       });
       sync();
-      sheetActions(body, [{ label: "Done", onClick: () => close() }]);
     }, { label: "Weekly save", title: "Weekly save", detent: "medium", onClose: () => {
       const b = document.querySelector("#slot-guess .gw-cap");
       if (b && (!document.activeElement || document.activeElement === document.body)) b.focus({ preventScroll: true });
@@ -107,18 +111,18 @@
 
   // Stacked food / getting around / night meter with cap and usual ticks. Hidden segments before the guess.
   function meter(api, revealed) {
-    const D = api.data, t = D.thisWeek, s = summarize(api.charges()), money = api.money;
-    const scale = Math.max(t.total, t.cap, D.usual.total) * 1.04;
+    const D = api.data, t = D.thisWeek, s = summarize(api.charges()), money = api.money, recap = recapOnly(api);
+    const scale = Math.max(t.total, recap ? 0 : t.cap, D.usual.total) * 1.04;
     const pct = v => (100 * v / scale).toFixed(2) + "%";
     const segs = revealed
       ? `<i class="fill-food" style="width:${pct(s.food)}"></i><i class="fill-move" style="width:${pct(s.move)}"></i>${s.night ? `<i class="fill-night" style="width:${pct(s.night)}"></i>` : ""}`
       : "";
     const label = revealed
-      ? `This week ${money(t.total)}: food ${money(s.food)}, getting around ${money(s.move)}${s.night ? `, night rides ${money(s.night)}` : ""}. Cap ${money(t.cap)}, usual ${money(D.usual.total)}.`
-      : `Cap ${money(t.cap)}, usual ${money(D.usual.total)}. This week is hidden until you guess.`;
+      ? `${weekName(api)} ${money(t.total)}: food ${money(s.food)}, getting around ${money(s.move)}${s.night ? `, night rides ${money(s.night)}` : ""}.${recap ? "" : ` Budget ${money(t.cap)},`} usual ${money(D.usual.total)}.`
+      : `${recap ? "" : `Budget ${money(t.cap)}, `}usual ${money(D.usual.total)}. ${weekName(api)} is hidden until you guess.`;
     // Both tick labels sit below the bar. If they would collide, the left one aligns right.
     // Labels near an edge turn inward; two close labels near the right edge stack.
-    const capL = 100 * t.cap / scale, usualL = 100 * D.usual.total / scale, close = Math.abs(capL - usualL) < 16;
+    const capL = recap ? -100 : 100 * t.cap / scale, usualL = 100 * D.usual.total / scale, close = Math.abs(capL - usualL) < 16;
     const side = (me, other) => {
       if (close && me >= other && me > 70) return " l low";
       if (close) return me < other ? " l" : " r";
@@ -126,7 +130,7 @@
     };
     return `<div class="gw-meter" role="img" aria-label="${label}">
       <div class="gw-track${revealed ? "" : " hidden"}">${segs}</div>
-      <span class="gw-tick${side(capL, usualL)}" style="left:${pct(t.cap)}"><b class="t-cap">Cap</b></span>
+      ${recap ? "" : `<span class="gw-tick${side(capL, usualL)}" style="left:${pct(t.cap)}"><b class="t-cap">Budget</b></span>`}
       <span class="gw-tick usual${side(usualL, capL)}" style="left:${pct(D.usual.total)}"><b class="t-cap">Usual</b></span>
     </div>`;
   }
@@ -216,26 +220,30 @@
       }
       const self = this;
       const draw = () => {
-        const D = api.data, t = D.thisWeek, g = guessOf(api);
+        const D = api.data, t = D.thisWeek, g = guessOf(api), recap = recapOnly(api);
         const s = summarize(api.charges());
         const capDiff = t.total - t.cap, usualDiff = t.total - D.usual.total;
-        // Under the cap: say by how much. Over it: no gap word, the cap row shows both numbers.
-        const status = g && capDiff <= 0 ? `${money(-capDiff)} under cap` : "";
-        const vsUsual = g ? (usualDiff === 0 ? "Right at your usual week" : `${money(Math.abs(usualDiff))} ${usualDiff < 0 ? "below" : "above"} usual week`) : "";
+        // Under the budget: say by how much. Over it: no gap word, the budget row shows both numbers.
+        const status = g && !recap && capDiff <= 0 ? `${money(-capDiff)} under budget` : "";
+        const vsUsual = g ? (usualDiff === 0 ? "Right at your usual week" : `${money(Math.abs(usualDiff))} ${usualDiff < 0 ? "below" : "above"} usual${recap ? "" : " week"}`) : "";
+        const wkName = typeof api.weekIsOld === "function" && api.weekIsOld() ? `Week of ${api.esc(String(D.weekLabel || "").split(" – ")[0])}` : weekName(api);
+        const heading = recap ? `${wkName} · Food + rides` : typeof api.dailyPlan === "function" && api.dailyPlan() ? `${wkName} · ${api.esc(D.weekLabel)}` : "Food and getting around";
         const owed = t.payback && t.payback.owed > 0 ? `<p class="t-foot t-3 gw-note">You owe ${money(t.payback.perWeek)}/wk · ${t.payback.weeksLeft} wks left</p>` : "";
         const node = el(`<section class="card hero gw-hero" aria-labelledby="gw-h">
-          <div class="gw-hero-top"><h2 class="t-headline" id="gw-h">${typeof api.dailyPlan === "function" && api.dailyPlan() ? `Last week · ${api.esc(D.weekLabel)}` : "Food and getting around"}</h2>${badge(api, "thisWeek")}</div>
+          <div class="gw-hero-top"><h2 class="t-headline" id="gw-h">${heading}</h2>${badge(api, "thisWeek")}</div>
           <div class="gw-total">${g
             ? `<span class="n-xl">${money(t.total)}</span>`
             : `<span class="n-xl gw-mask" aria-hidden="true">$•••</span><span class="vh">Hidden until you guess</span>`}</div>
           ${status ? `<p class="gw-status t-title3">${status}</p>` : ""}
-          ${vsUsual ? `<p class="t-foot t-2 gw-vs">${vsUsual}</p>` : ""}
+          ${vsUsual || recap ? `<p class="t-foot t-2 gw-vs">${[recap ? api.esc(D.weekLabel) : "", vsUsual].filter(Boolean).join(" · ")}</p>` : ""}
           ${meter(api, !!g)}
           ${g ? `<div class="gw-legend t-foot t-2"><span><i class="dot food"></i>Food <b class="num">${money(s.food)}</b></span><span><i class="dot move"></i>Getting around <b class="num">${money(s.move)}</b></span>${s.night ? `<span><i class="dot night"></i>Night <b class="num">${money(s.night)}</b></span>` : ""}</div>` : ""}
-          <div class="list gw-rows">
-            <button class="row gw-cap" aria-label="Cap ${money(t.cap)}. ${capLine(api, D)}. Change weekly save">
-              <span class="grow"><span class="t-body">Cap</span><span class="t-foot t-2 num gw-formula">${capLine(api, D)}</span></span>
-              <span class="amt t-body">${money(t.cap)}</span>${icon("chevron", 18, 2.2)}</button>
+          <div class="list gw-rows">${recap
+            ? `<div class="row gw-cap gw-usual"><span class="grow"><span class="t-body">Food + rides usual</span><span class="t-foot t-2 gw-formula">6-week average</span></span>
+              <span class="amt t-body num">${money(D.usual.total)}</span></div>`
+            : `<button class="row gw-cap" aria-label="Budget ${money(t.cap)}. ${capLine(api, D)}. Change weekly save">
+              <span class="grow"><span class="t-body">Budget</span><span class="t-foot t-2 num gw-formula">${capLine(api, D)}</span></span>
+              <span class="amt t-body">${money(t.cap)}</span>${icon("chevron", 18, 2.2)}</button>`}
           </div>
           ${owed}
           ${g
@@ -244,7 +252,8 @@
             : `<button class="btn primary block gw-cta" data-go="guess">Guess your week</button>`}
         </section>`);
         node.querySelectorAll("[data-go]").forEach(b => b.addEventListener("click", () => { api.haptic(); self.open(api, b.dataset.go); }));
-        node.querySelector(".gw-cap").addEventListener("click", () => { api.haptic(); openSave(api); });
+        const capBtn = node.querySelector("button.gw-cap");
+        capBtn && capBtn.addEventListener("click", () => { api.haptic(); openSave(api); });
         slot.replaceChildren(node);
       };
       draw();
@@ -254,7 +263,7 @@
 
     open(api, startAt) {
       const { el, icon, money, animate, haptic, store, sheet, sheetActions, focusTitle, toast, esc } = api;
-      const D = api.data, t = D.thisWeek;
+      const D = api.data, t = D.thisWeek, recap = recapOnly(api);
       const items = summarize(api.charges());
       let storyURL = null;
 
@@ -330,22 +339,23 @@
         function revealStep(guess) {
           const real = t.total, usual = D.usual.total, off = Math.abs(real - guess);
           const diff = real - usual, pct = Math.round(100 * Math.abs(diff) / usual);
-          const scale = Math.max(real, usual, t.cap) * 1.04, w = v => (100 * v / scale).toFixed(2) + "%";
+          const scale = Math.max(real, usual, recap ? 0 : t.cap) * 1.04, w = v => (100 * v / scale).toFixed(2) + "%";
           const delta = diff === 0 ? "Right at your usual week" : `${money(Math.abs(diff))} ${diff < 0 ? "below" : "above"} usual week (${pct}%)`;
-          const underCap = real <= t.cap ? `${money(t.cap - real)} under cap` : "";
+          const underCap = !recap && real <= t.cap ? `${money(t.cap - real)} under budget` : "";
+          const capMark = recap ? "" : `<span class="cap" style="left:${w(t.cap)}"></span>`;
           const said = `This week: ${money(real)}. You guessed ${money(guess)}${off ? `, off by ${money(off)}` : ", exactly right"}. ${underCap ? underCap + ". " : ""}${delta}.`;
           const node = el(`<div class="gw-step center gw-reveal">
             <h2 class="t-title">${weekName(api)} ${badge(api, "thisWeek")}</h2>
             <div class="gw-roll n-xl" aria-hidden="true"></div>
             <p class="vh" role="status"></p>
             <p class="t-body t-2 gw-guessline">You guessed <b class="num">${money(guess)}</b>${off ? ` · off by <b class="num">${money(off)}</b>` : " · exactly right"}</p>
-            <div class="gw-bars" role="img" aria-label="This week ${money(real)}: food ${money(items.food)}, getting around ${money(items.move)}${items.night ? `, night rides ${money(items.night)}` : ""}. Usual ${money(usual)}. Cap ${money(t.cap)}.">
+            <div class="gw-bars" role="img" aria-label="This week ${money(real)}: food ${money(items.food)}, getting around ${money(items.move)}${items.night ? `, night rides ${money(items.night)}` : ""}. Usual ${money(usual)}.${recap ? "" : ` Budget ${money(t.cap)}.`}">
               <div class="gw-bar"><div class="top t-sub"><span>${weekName(api)}</span><b class="num">${money(real)}</b></div>
-                <div class="track"><i class="fill-food" style="width:${w(items.food)}"></i><i class="fill-move" style="width:${w(items.move)}"></i>${items.night ? `<i class="fill-night" style="width:${w(items.night)}"></i>` : ""}<span class="cap" style="left:${w(t.cap)}"></span></div></div>
+                <div class="track"><i class="fill-food" style="width:${w(items.food)}"></i><i class="fill-move" style="width:${w(items.move)}"></i>${items.night ? `<i class="fill-night" style="width:${w(items.night)}"></i>` : ""}${capMark}</div></div>
               <div class="gw-bar"><div class="top t-sub"><span>Usual week</span><b class="num">${money(usual)}</b></div>
-                <div class="track"><i class="usual" style="width:${w(usual)}"></i><span class="cap" style="left:${w(t.cap)}"></span></div></div>
+                <div class="track"><i class="usual" style="width:${w(usual)}"></i>${capMark}</div></div>
             </div>
-            <div class="gw-legend t-foot t-2"><span><i class="dot food"></i>Food <b class="num">${money(items.food)}</b></span><span><i class="dot move"></i>Getting around <b class="num">${money(items.move)}</b></span>${items.night ? `<span><i class="dot night"></i>Night <b class="num">${money(items.night)}</b></span>` : ""}<span><i class="gw-capkey"></i>Cap <b class="num">${money(t.cap)}</b></span></div>
+            <div class="gw-legend t-foot t-2"><span><i class="dot food"></i>Food <b class="num">${money(items.food)}</b></span><span><i class="dot move"></i>Getting around <b class="num">${money(items.move)}</b></span>${items.night ? `<span><i class="dot night"></i>Night <b class="num">${money(items.night)}</b></span>` : ""}${recap ? "" : `<span><i class="gw-capkey"></i>Budget <b class="num">${money(t.cap)}</b></span>`}</div>
             <div class="gw-delta">${underCap ? `<p class="t-headline">${underCap}</p>` : ""}<p class="t-sub t-2">${delta}</p></div>
           </div>`);
           swapIn(node);
@@ -374,7 +384,7 @@
               <div class="gw-paper">
                 <div class="head"><b>SWAP · WEEKLY</b><span>${esc(D.weekLabel)}${real ? "" : D.source === "real" ? " · sample week" : " · sample student"}</span></div>
                 ${line("Food", items.food, "group")}
-                ${opt("Eating out", items.dining)}${opt("Clubs, bars &amp; bodega", items.drinks)}${opt("Coffee &amp; snacks", items.quick)}${opt("Delivery", items.delivery)}
+                ${opt("Eating out", items.dining)}${opt("Clubs &amp; bars, bodega &amp; liquor", items.drinks)}${opt("Coffee &amp; snacks", items.quick)}${opt("Delivery", items.delivery)}
                 ${line("Getting around", items.move, "group")}
                 ${items.rideCount ? line(`Rides (${items.rideCount})`, items.ride) : ""}
                 ${opt("Subway", items.transit)}
@@ -382,8 +392,8 @@
                 <div class="rule"></div>
                 ${line("Total", t.total, "total")}
                 ${t.paidBack ? `<div class="ln sub flush"><span>Paid back</span><span>${money(t.paidBack)}</span></div><p class="fine">Not taken off.</p>` : ""}
-                <div class="ln sub flush"><span>Cap</span><span>${money(t.cap)}</span></div>
-                <p class="fine">${capLine(api, D)}</p>
+                ${recap ? `<div class="ln sub flush"><span>Usual food + rides</span><span>${money(D.usual.total)}</span></div>`
+                  : `<div class="ln sub flush"><span>Budget</span><span>${money(t.cap)}</span></div><p class="fine">${capLine(api, D)}</p>`}
                 ${pick ? `<div class="swapbox">${brandOf(api, pick) ? api.brandMark(brandOf(api, pick), pick.kind, 28) : ""}<div><span>${api.store.get("deckPick") === pick.id ? "This week's swap" : "A swap to try"}</span><b>${esc(pick.title)}</b>${pick.why ? `<span>${esc(pick.why)}</span>` : ""}<span>About ${money(pick.save)} ${UNIT[pick.unit] || "a " + pick.unit}</span></div></div>` : ""}
                 ${items.nightCount ? `<p class="fine">*Night rides, 11 PM–6 AM: always OK.</p>` : ""}
                 <div class="barcode" aria-hidden="true"></div>
@@ -392,10 +402,8 @@
           swapIn(node);
           const paper = node.querySelector(".gw-paper");
           animate(paper, [{ clipPath: "inset(0 0 100% 0)", translate: "0 -24px", opacity: 0 }, { opacity: 1, offset: .08 }, { clipPath: "inset(0 0 0% 0)", translate: "0 0", opacity: 1 }], { preset: "gentle", duration: 1300 });
-          sheetActions(body, [
-            { label: "Share", kind: "secondary", icon: "share", onClick: shareStep },
-            { label: "Done", onClick: () => close() }
-          ]);
+          // One action; the Close X ends the sheet (no Done in the bottom bar).
+          sheetActions(body, [{ label: "Share", icon: "share", onClick: shareStep }]);
         }
 
         // ---- Step 4: share a story image (percent only, never dollars) ----

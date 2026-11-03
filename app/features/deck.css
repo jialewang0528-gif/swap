@@ -52,9 +52,20 @@
 /* This week's swap */
 .dk .section-title { margin-top: var(--s-6); }
 .dk-pick { padding: var(--s-4); }
-.dk-pick-row { display: flex; align-items: center; gap: var(--s-3); }
+.dk-pick-row { display: flex; align-items: flex-start; gap: var(--s-3); padding: var(--s-3) 0; }
+.dk-pick-row > .brandmark { margin-top: 2px; }
 .dk-pick-row .grow { flex: 1; min-width: 0; }
-.dk-pick-t, .dk-pick-a, .dk-pick-note, .dk-empty { margin: 0; overflow-wrap: anywhere; }
+.dk-pick-t, .dk-pick-a, .dk-pick-note, .dk-empty, .dk-last { margin: 0; overflow-wrap: anywhere; }
+.dk-pick-row .amt { flex: none; white-space: nowrap; font-weight: 600; }
+.dk-picks { margin: 0; padding: 0; list-style: none; }
+.dk-pick-acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); margin-top: var(--s-2); }
+.dk-pick-acts .btn { min-height: var(--tap); }
+.dk-pick-acts .dk-unpick { margin-left: auto; }
+.dk-tally { white-space: nowrap; }
+.dk-last { margin-top: var(--s-2); }
+.dk-pick .dk-keep { margin-top: var(--s-3); }
+.dk-empty:focus { outline: none; }
+.dk-wk { margin: 0; }
 .dk-pick-note { margin-top: var(--s-3); padding-top: var(--s-3); box-shadow: 0 -.5px 0 var(--hair); }
 
 @media (prefers-reduced-motion: reduce) {
@@ -64,3 +75,4 @@
 .dk-picks-sum { padding: 0 var(--s-1) var(--s-1); }
 .dk-picks-sum b { font-size: 1.176rem; font-weight: 700; color: var(--accent-ink); }
 .dk-pick .list .row + .row { box-shadow: 0 -.5px 0 var(--hair); }
+.dk #dk-pick-h:focus { outline: none; }

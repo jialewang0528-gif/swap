@@ -1,20 +1,35 @@
-/* Where your money goes. Tokens only. */
-.mo { display: grid; gap: var(--s-3); }
-.mo-head { display: flex; justify-content: space-between; align-items: flex-end; gap: var(--s-3); }
-.mo-head > div { display: grid; gap: 2px; }
-.mo-big { font-size: 2.353rem; font-weight: 700; line-height: 1.05; }
+/* Where your money goes. Tokens only. ("Biggest places" uses the .bk-more disclosure from bank.css.) */
+.mo { display: grid; gap: var(--s-3); container-type: inline-size; }
+.mo-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: var(--s-1) var(--s-3); }
+.mo-head > div { display: grid; gap: 2px; min-width: 0; }
+.mo-big { font-family: var(--round); font-variant-numeric: tabular-nums; font-size: min(2.353rem, 13vw); font-weight: 700; line-height: 1.05; }
 .mo-in { text-align: right; }
-.mo-in b { font-size: 1.176rem; font-weight: 700; color: var(--accent-ink); }
-.mo-list { list-style: none; margin: 0; padding: 0; display: grid; }
-.mo-cat { display: grid; grid-template-columns: 14px minmax(0, 1.3fr) minmax(0, 1fr) auto; align-items: center; gap: var(--s-2); min-height: 48px; }
+.mo-in b { font-size: min(1.176rem, 8vw); font-weight: 700; color: var(--accent-ink); }
+.mo-food { margin: calc(-1 * var(--s-1)) 0 0; }
+.mo-food b { color: var(--ink); font-weight: 600; }
+
+/* Rows share one set of columns (subgrid), so every bar starts and ends at the same x. */
+.mo-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 14px minmax(0, 1.3fr) minmax(0, 1fr) auto; column-gap: var(--s-2); }
+.mo-cat { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; min-height: 48px; padding: var(--s-1) 0; }
 .mo-cat + .mo-cat { box-shadow: 0 -.5px 0 var(--hair); }
-.mo-name { display: grid; min-width: 0; overflow-wrap: anywhere; }
+.mo-name { display: grid; min-width: 0; overflow-wrap: break-word; hyphens: auto; }
 .mo-track { height: 8px; border-radius: var(--r-pill); background: var(--fill); overflow: hidden; }
 .mo-track i { display: block; height: 100%; border-radius: inherit; background: var(--ink-4); }
 .mo-track i.food { background: var(--food); }
 .mo-track i.move { background: var(--move); }
-.mo-amt { font-weight: 600; text-align: right; white-space: nowrap; }
+.mo-amt { font-weight: 600; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* Narrow card (small phone or large text): the name gets its own line, bar and amount go under it. */
+@container (max-width: 17rem) {
+  .mo-in { text-align: left; }
+  .mo-list { grid-template-columns: 14px minmax(0, 1fr) auto; }
+  .mo-name { grid-column: 2 / -1; }
+  .mo-track { grid-column: 2; }
+}
+
 .mo-rest, .mo-fine { margin: 0; }
-.mo-h { margin: var(--s-1) 0 0; font-weight: 600; color: var(--ink-2); }
 .mo .grow { display: grid; }
-.mo-place { overflow-wrap: anywhere; }
+.mo .row { flex-wrap: wrap; column-gap: var(--s-3); }
+.mo .row .grow { flex: 1 1 auto; }   /* wraps the amount under the name when both don't fit */
+.mo .row .amt { margin-left: auto; }
+.mo-place { overflow-wrap: break-word; }

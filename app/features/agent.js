@@ -38,16 +38,22 @@ Swap.feature({
     const M = (n, d = 0) => `<b class="num">${money(n, d)}</b>`;
     const pct = (a, b) => (b > 0 ? Math.max(0, Math.min(100, 100 * a / b)) : 0).toFixed(2) + "%";
     const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-    const CAT = { dining: "Eating out", drinks: "Clubs, bars & bodega", delivery: "Delivery", quick: "Coffee & snacks", ride: "Rides", transit: "Subway" };
+    const CAT = Object.assign({ dining: "Eating out", drinks: "Clubs & bars, bodega & liquor", delivery: "Delivery", quick: "Coffee & snacks", ride: "Rides", transit: "Subway" },
+      (window.SwapCategory && window.SwapCategory.KIND_CAT) || {});
+    const CAT_LIST = ["dining", "drinks", "quick", "delivery", "ride", "transit"].map(k => CAT[k]).join(", ");
     const FOODK = ["dining", "drinks", "delivery", "quick"], MOVEK = ["ride", "transit"];
-    const UNIT = { week: "a week", order: "an order", meal: "a meal", ride: "a ride", month: "a month" };
+    const UNIT = { week: "a week", order: "an order", meal: "a meal", ride: "a ride", month: "a month", run: "a run", night: "a night" };
     const unitOf = s => UNIT[s.unit] || "each time";
     const quiet = { duration: 200, easing: "cubic-bezier(.2,.9,.3,1)" };
     const AI = () => !!(window.SwapAI && window.SwapAI.available());
 
     // ---------- Core helpers (with fallbacks while core catches up) ----------
     const allReal = typeof api.allReal === "function" ? api.allReal() : (D.source === "real" && api.isReal("thisWeek") && api.isReal("charges"));
-    const isRideApp = n => typeof api.isRideApp === "function" ? api.isRideApp(n) : /lower-fare|rideapp/i.test(String(n || ""));
+    // The ride app's own name comes from the profile (api.data.rideAppName, private build only).
+    const escRe = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const RIDE_NAME = D.rideAppName ? escRe(String(D.rideAppName).toLowerCase()) : "";
+    const RIDE_APP_RE = new RegExp(`lower[- ]fare${RIDE_NAME ? `|${RIDE_NAME}` : ""}`, "i");
+    const isRideApp = n => typeof api.isRideApp === "function" ? api.isRideApp(n) : RIDE_APP_RE.test(String(n || ""));
     const rideAppOK = () => typeof api.rideAppAllowed === "function" ? api.rideAppAllowed() : false;
     const show = n => typeof api.displayMerchant === "function" ? api.displayMerchant(n) : n;
     const badge = field => typeof api.badge === "function" ? api.badge(field) : (api.isReal(field) ? `<span class="real">Real</span>` : `<span class="sample">Sample</span>`);
@@ -76,7 +82,7 @@ Swap.feature({
     const changeQ = facts0.moved && D.move && D.move.date ? "What changed since I moved?" : "Where's my money going?";
     const hasPlan0 = typeof api.dailyPlan === "function" && !!api.dailyPlan();
     const BASE = {
-      you: hasPlan0 ? ["How much can I spend today?", "Am I on track?", "What's my cap this week?", "What's my most unnecessary spending?"] : ["How's my week?", "Can I get dinner tonight?", rideAppOK() ? "Cheaper ride?" : "Cheaper way to class?", changeQ],
+      you: hasPlan0 ? ["How much can I spend today?", "Am I on track?", `What's my ${(() => { try { const b = typeof api.budget === "function" ? api.budget() : null, p = api.dailyPlan(); return (b ? b.scope : p && p.scope) === "all" ? "budget" : "cap"; } catch (e) { return "cap"; } })()} this week?`, "What's my most unnecessary spending?"] : ["How's my week?", "Can I get dinner tonight?", rideAppOK() ? "Cheaper ride?" : "Cheaper way to class?", changeQ],
       mealplan: ["How's my week?", "Should I use my swipes?", "Can I get pizza tonight?", changeQ],
       social: ["How's my week?", "Dinner with friends tonight?", "Is Uber One worth it?", "Where's my money going?"]
     };
@@ -241,13 +247,38 @@ Swap.feature({
     // no current-week data). weekView("last") = the recap week. `open` is false only while the recap
     // week's total is hidden behind the guess.
     const plan = () => typeof api.dailyPlan === "function" ? api.dailyPlan() : null;
+    // One verdict for "am I on track", shared with the Today card (api.planStatus, $5 tolerance).
+    // { state: "first" | "on" | "under" | "over", by }.
+    function status(p) {
+      p = p || plan();
+      if (!p) return null;
+      if (p.today === 0) return { state: "first", by: 0 };
+      let s = null;
+      try { s = typeof api.planStatus === "function" ? api.planStatus(p) : null; } catch (e) { s = null; }
+      if (s && s.first) return { state: "first", by: 0 };
+      if (s && /^(on|under|over)$/.test(s.state)) return { state: s.state, by: Math.abs(Math.round(+s.by || 0)), text: s.text };
+      const a = p.aheadBy;
+      return Math.abs(a) <= 5 ? { state: "on", by: Math.abs(a) } : a > 0 ? { state: "under", by: a } : { state: "over", by: -a };
+    }
+    // The all-spending weekly target ("Budget"), from api.budget() when core has it.
+    function budget() {
+      let b = null;
+      try { b = typeof api.budget === "function" ? api.budget() : null; } catch (e) { b = null; }
+      const p = plan();
+      if (b && typeof b.budget === "number") return { budget: b.budget, usual: b.usual, save: b.save, scope: b.scope || (p && p.scope) };
+      return p ? { budget: p.cap, usual: p.usual, save: p.save, scope: p.scope } : null;
+    }
+    const budgetWord = () => { const b = budget(); return b && b.scope === "all" ? "Budget" : "Cap"; };
+    // This week's picked swaps (window.SwapPicks, swapmath.js). Falls back to the single "deckPick".
+    const SP = () => window.SwapPicks || null;
+    const myPicks = () => SP() ? SP().list(api) : (() => { const s = api.swaps().find(x => x.id === store.get("deckPick")); return s ? [{ id: s.id, swap: s, weekly: s.save, formula: "" }] : []; })();
     const sumOf = l => l.reduce((s, c) => s + c.amount, 0);
     const dayIdx = c => typeof api.dayOf === "function" ? api.dayOf(c) : c.day;
     const isNight = c => c.kind === "ride" && (c.tag === "night" || (c.time ? inNight(+c.time.slice(0, 2)) : false));
     const dLabel = d => `${d.dow} ${d.short}`;
     const recapLabel = () => (weekPast() || plan()) ? "Last week" : WN;
     // Bank categories that map onto the food / getting-around kinds.
-    const KIND_OF_CAT = { "Eating out": "dining", "Clubs & bars": "drinks", "Bodega & liquor": "drinks", "Alcohol & bodega": "drinks", "Coffee & snacks": "quick", "Delivery": "delivery", "Rides": "ride", "Subway": "transit" };
+    const KIND_OF_CAT = { "Eating out": "dining", "Clubs & bars": "drinks", "Bodega & liquor": "drinks", "Alcohol & bodega": "drinks", "Coffee & snacks": "quick", "Delivery": "delivery", "Rides": "ride", "Subway": "transit", [CAT.drinks]: "drinks" };
     // What counts as cuttable for "most unnecessary". Rides, money to friends, bills and health are not.
     const CUTTABLE = /eating out|shopping|alcohol|bodega|club|\bbars?\b|liquor|subscription|coffee|snack|delivery|\bfun\b|entertainment|prediction|gambl/i;
     // A charge from dailyPlan(): food/ride charges ({kind, merchant}) or, with whole-bank data, bank
@@ -293,7 +324,7 @@ Swap.feature({
       const BW = BK && Array.isArray(BK.weekly) ? BK.weekly.filter(w => !start || w.wk < start).slice(-10) : [];
       return { n: W.length, cats, total: cats.reduce((s, x) => s + x.avg, 0), bank: BW.length ? { n: BW.length, out: avg(BW, "out"), in: avg(BW, "in") } : null };
     }
-    // The ride app may be suggested only on the founder's build, and only when he doesn't already use it.
+    // The ride app may be suggested only where core allows it, and only when it isn't already the usual app.
     const rideAppSuggestOK = () => rideAppOK() && !(D.rideAppShare >= 0.8);
 
     // ---------- Cards ----------
@@ -357,7 +388,7 @@ Swap.feature({
       }).join("");
       return el(`<div class="card ag-card" role="group" aria-label="Daily plan this week">
         ${head("Daily plan", `<span class="t-foot t-2 num">${money(p.spent)} of ${money(p.cap)}</span>`)}
-        ${rows}
+        <div class="ag-prows">${rows}</div>
         <div class="ag-legend t-foot t-2"><span><i class="dot ag-dot-spent"></i>Spent</span><span><i class="ag-tick" aria-hidden="true"></i>Plan</span></div>
       </div>`);
     }
@@ -437,7 +468,7 @@ Swap.feature({
     }
     function swapCard(s) {
       return el(`<div class="card ag-card ag-swap">
-        ${api.brandMark(brandOf(s), s.kind === "move" ? "move" : "food", 36)}
+        ${window.SwapMath ? window.SwapMath.mark(api, s, 36) : api.brandMark(brandOf(s), s.kind === "move" ? "move" : "food", 36)}
         <span class="grow"><h3 class="t-headline">${esc(s.title)}</h3><span class="t-sub t-2">${esc(s.detail)}</span><span class="t-foot t-3">${esc(String(s.basis).replace(/\s*→\s*/g, " vs "))}</span></span>
         <span class="ag-save"><b class="num">${money(s.save)}</b><span class="t-foot t-2">${unitOf(s)}</span></span>
       </div>`);
@@ -544,7 +575,7 @@ Swap.feature({
     }
     const bareAmount = t => { const m = t.match(/^\s*(?:about|around|like|maybe|it's|its|it was|was)?\s*\$?\s?(\d{1,4}(?:\.\d{1,2})?)\s*(?:dollars|bucks)?\s*[.?]?\s*$/); return m ? +m[1] : null; };
     const inNight = h => h >= D.nightWindow.start || h < D.nightWindow.end;
-    const RIDE = /\b(ride|rides|uber|ubers|lyft|lyfts|cab|cabs|taxi|rideshare|rideapp)\b/;
+    const RIDE = new RegExp(`\\b(ride|rides|uber|ubers|lyft|lyfts|cab|cabs|taxi|rideshare${RIDE_NAME ? `|${RIDE_NAME}` : ""})\\b`);
     const FOODS = ["sushi", "pizza", "ramen", "thai", "tacos", "taco", "burger", "burgers", "chipotle", "pho", "wings", "poke", "takeout", "delivery", "doordash", "food", "dinner", "lunch", "brunch", "drinks", "boba", "coffee"];
     const SOCIAL = /\b(friends?|girls|guys|roommates?|date|drinks|bar|bars|party|birthday|brunch with|out with|night out|going out|group|club)\b/;
     const hasFood = t => FOODS.some(f => new RegExp(`\\b${f}\\b`).test(t));
@@ -603,7 +634,7 @@ Swap.feature({
       if ((ride || home) && nightish && /\b(save|saving|cut|cutting)\b/.test(t) && !/\bcheap|cheaper|cheapest|app\b/.test(t)) return { id: "protect" };
       // 2. Log a night ride only when they clearly took one.
       if (ride && strongNight && !asking && /\b(took|taken|had to take|got|caught|grabbed|rode|ubered|lyfted|called)\b/.test(t))
-        return { id: "night", time: time ? time.label : null, amount, app: (t.match(/\b(uber|lyft|cab|taxi|rideapp)\b/) || [])[1] };
+        return { id: "night", time: time ? time.label : null, amount, app: (t.match(new RegExp(`\\b(uber|lyft|cab|taxi${RIDE_NAME ? `|${RIDE_NAME}` : ""})\\b`)) || [])[1] };
       if (/\b(dashpass|dash pass|uber one|uber\+|uber plus|membership|subscription)\b/.test(t) || (/worth it/.test(t) && /doordash|uber|delivery/.test(t)))
         return { id: "member", which: /dash/.test(t) || /delivery|doordash/.test(t) ? "DashPass" : /uber/.test(t) ? "Uber One" : null };
       if (/\b(split|splitting|venmo|go halves|share the (ride|bill|cab|check))\b/.test(t))
@@ -660,8 +691,8 @@ Swap.feature({
       const shown = c => (rideAppOK() || !isRideApp(c.merchant)) ? show(c.merchant) : "Ride app";
       L.push(allReal ? "Source: your real bank data." : "Source: a sample student, not real card data.");
       const all = !!(p && p.scope === "all"), fcap = typeof api.capOf === "function" ? api.capOf() : T.cap;
-      if (all) L.push(`Budget this week covers ALL spending out of the bank (except investing). The food + getting around cap (${$(fcap)}) covers only Eating out, Clubs, bars & bodega, Coffee & snacks, Delivery, Rides, Subway; use it only for food or ride questions, and for last week.`);
-      else L.push("The cap covers food and getting around only: Eating out, Clubs, bars & bodega, Coffee & snacks, Delivery, Rides, Subway. Food = the first four. Getting around = Rides + Subway.");
+      if (all) L.push(`Budget this week covers ALL spending out of the bank (except investing). The food + getting around cap (${$(fcap)}) covers only ${CAT_LIST}; use it only for food or ride questions, and for last week.`);
+      else L.push(`The cap covers food and getting around only: ${CAT_LIST}. Food = the first four. Getting around = Rides + Subway.`);
       if (p) {
         const td = p.days[p.today], v = weekView("this"), C = v.charges, CW = all ? "Budget" : "Cap";
         L.push(`Today is ${td.dow} ${td.short}. "This week" = ${dLabel(p.days[0])} to ${dLabel(p.days[6])}. "Last week" = ${D.weekLabel ? D.weekLabel.replace(/\s*[–-]\s*/, " to ") : "the week before"}.`);
@@ -676,8 +707,9 @@ Swap.feature({
           L.push("By category this week: " + (topCats(C).map(x => `${x.cat} ${$(x.total)}`).join(", ") || "nothing yet") + ".");
         } else L.push("By category this week: " + KINDS.map(k => { const l = C.filter(c => c.kind === k); return `${CAT[k]} ${$(sum(l))} (${l.length} ${CU[k][l.length === 1 ? 0 : 1]})`; }).join(", ") + ".");
         const past = p.days.filter(d => d.past), pBefore = past.reduce((s, d) => s + d.plan, 0), sBefore = past.reduce((s, d) => s + d.spent, 0), a = p.aheadBy;
-        L.push(p.today === 0 ? "Plan status this week: first day, nothing to compare yet."
-          : `Plan status this week: ${Math.abs(a) <= 5 ? "on plan" : a > 0 ? `${$(a)} under plan so far` : `${$(-a)} over plan so far`} (plan before today ${$(pBefore)}, spent before today ${$(sBefore)}).`);
+        const vs = status(p);
+        L.push(vs.state === "first" ? "Plan status this week: nothing to compare yet."
+          : `Plan status this week: ${vs.state === "on" ? "on plan" : vs.state === "under" ? `${$(vs.by)} under plan so far` : `${$(vs.by)} over plan so far`} (plan before today ${$(pBefore)}, spent before today ${$(sBefore)}).`);
         const nights = C.filter(c => c.night);
         L.push(nights.length ? `Night rides this week (11 PM to 6 AM, always OK): ${nights.length}, ${$(sum(nights))}.` : "Night rides this week: none.");
         const list = C.slice().sort(byTime).slice(-14);
@@ -779,10 +811,9 @@ Swap.feature({
         L.push(`You moved on ${when}. Rides before the move: ${$(mv.rideSpendBefore)} a week. Rides since the move: ${$(mv.rideSpendAfter)} a week.` +
           (mv.deliverySpendBefore != null ? ` Delivery before: ${$(mv.deliverySpendBefore)} a week. Delivery since: ${$(mv.deliverySpendAfter)} a week.` : ""));
       }
-      const list = api.swaps(), pickId = store.get("deckPick");
-      const pick = list.find(x => x.id === pickId) || (D.swaps || []).find(x => x.id === pickId);
-      L.push(pick ? `Your swap: ${pick.title}, saves about ${$(pick.save)} ${unitOf(pick)}.` : `Your swap: none chosen yet.`);
-      const next = list.find(x => x.id !== pickId && (rideAppSuggestOK() || !(x.rideApp || isRideApp(`${x.title} ${x.detail || ""}`))));
+      const list = api.swaps(), mine = myPicks(), mineIds = mine.map(x => x.id);
+      L.push(mine.length ? `Your swaps this week: ` + mine.map(x => `${x.swap.title} (${x.formula || `about ${$(x.swap.save)} ${unitOf(x.swap)}`})`).join("; ") + `. About ${$(mine.reduce((t, x) => t + x.weekly, 0))} a week in all.` : `Your swaps this week: none chosen yet.`);
+      const next = list.find(x => !mineIds.includes(x.id) && !x.sub && (rideAppSuggestOK() || !(x.rideApp || isRideApp(`${x.title} ${x.detail || ""}`))));
       if (next) L.push(`Swap idea (only when asked how to save): ${next.title}. ${next.detail} Saves about ${$(next.save)} ${unitOf(next)}.`);
       L.push("Night rides (11 PM to 6 AM) count as spending but are always OK: never suggest skipping one, walking, or the subway at night.");
       return L.join("\n");
@@ -819,8 +850,8 @@ Swap.feature({
       const s = clean(raw);
       if (!s || s.length < 2 || /[<>{}\[\]]/.test(s)) return null;
       const q = question.toLowerCase();
-      // The ride app is suggested only where rideAppSuggestOK(); he already uses it for almost every ride.
-      if (!rideAppSuggestOK() && /lower[- ]fare|rideapp|ride app/i.test(s) && /\b(try|use|using|switch|take|book|go with|cheaper|instead|stick)\b/i.test(s)) return null;
+      // The ride app is suggested only where rideAppSuggestOK().
+      if (!rideAppSuggestOK() && (RIDE_APP_RE.test(s) || /ride app/i.test(s)) && /\b(try|use|using|switch|take|book|go with|cheaper|instead|stick)\b/i.test(s)) return null;
       const nightQ = RIDE.test(q) && (/\b(night|late|midnight|after the (bar|party))\b/.test(q) || (parseTime(q) && inNight(parseTime(q).h)));
       if (nightQ && /\b(skip|walk|walking|subway|train)\b/i.test(s) && !/don't skip/i.test(s.replace(/[’]/g, "'"))) return null;
       if (/\bnight\b/i.test(s) && /\b(skip|walk|walking|subway|train)\b/i.test(s) && !/don't skip|always ok/i.test(s.replace(/[’]/g, "'"))) return null;
@@ -883,7 +914,7 @@ Swap.feature({
       let must = [];
       if (it.id === "cap") must = !isThis(it) ? [r(T.cap)] : it.focus && p.scope === "all" ? [r(typeof api.capOf === "function" ? api.capOf() : T.cap)] : [r(p.cap)];
       if (it.id === "today" && p && it.amount == null) must = [r(it.spentQ ? p.days[p.today].spent : Math.max(0, p.todayLeft))];
-      if (it.id === "track" && p && isThis(it) && p.today > 0 && Math.abs(p.aheadBy) > 5) must = [Math.abs(p.aheadBy)];
+      if (it.id === "track" && p && isThis(it)) { const vs = status(p); if (vs && (vs.state === "under" || vs.state === "over")) must = [vs.by]; }
       if (it.id === "plan" && p) must = [r(p.days[p.today].plan)];
       if (it.id === "week" && !it.focus && !it.month && isThis(it)) must = [r(p.spent)];
       return { must, forbid, single };
@@ -944,11 +975,11 @@ Swap.feature({
     // ---------- Answers ----------
     const undo = [];
     function pickSwap(b, s, doneLabel) {
-      const prev = store.get("deckPick");
-      store.set("deckPick", s.id);
-      undo.push({ kind: "pick", prev, title: s.title });
-      haptic("success"); markDone(b, doneLabel || "This week's swap");
-      toast(`This week's swap: ${s.title}`);
+      const prev = store.get("deckPick"), had = SP() ? SP().has(api, s.id) : prev === s.id;
+      if (SP()) SP().add(api, s.id); else store.set("deckPick", s.id);
+      undo.push({ kind: "pick", prev, id: s.id, had, title: s.title });
+      haptic("success"); markDone(b, doneLabel || "Added");
+      toast(`Added to this week: ${s.title}`);
     }
     async function gate(stack) {
       await say(stack, [`Cap: ${M(T.cap)}.`, "Guess your week first."]);
@@ -1022,7 +1053,9 @@ Swap.feature({
         let v = weekView(it.scope);
         if (v.cur && v.all && foodQ) v = foodView(v);
         const cp = typeof api.capParts === "function" ? api.capParts() : { usual: U.total, save: T.saveTarget, owed: 0 };
-        const usual = v.all ? v.usual : cp.usual, save = v.all ? v.save : cp.save;
+        const bg = v.all && v.cur ? budget() : null;
+        if (bg) v = Object.assign({}, v, { cap: bg.budget, left: Math.round((bg.budget - v.spent) * 100) / 100 });
+        const usual = bg && bg.usual != null ? bg.usual : v.all ? v.usual : cp.usual, save = bg && bg.save != null ? bg.save : v.all ? v.save : cp.save;
         const why = `usual ${M(usual)} − ${M(save)} save${!v.all && cp.owed ? ` − ${M(cp.owed)} owed` : ""}`;
         const name = v.all ? "Budget this week" : v.foodCap ? "Food + getting around cap this week" : `Cap ${v.lw}`;
         if (!v.open) { await say(stack, [`${name}: ${M(v.cap)} (${why}).`, "Guess your week to see what you spent."]); guessButton(stack); return; }
@@ -1066,9 +1099,9 @@ Swap.feature({
           await card(stack, capCard(v));
           return;
         }
-        const a = p.aheadBy, d = p.days[p.today];
-        const first = p.today === 0 ? `First day. Plan today: ${M(d.plan)}.`
-          : Math.abs(a) <= 5 ? "Yes, right on plan." : a > 0 ? `Yes, ${M(a)} under plan so far.` : `Not quite: ${M(-a)} over plan so far.`;
+        const vs = status(p), d = p.days[p.today];
+        const first = vs.state === "first" ? `${p.today === 0 ? "First day" : "Nothing to compare yet"}. Plan today: ${M(d.plan)}.`
+          : vs.state === "on" ? "Yes, on plan so far." : vs.state === "under" ? `Yes, ${M(vs.by)} under plan so far.` : `Not quite: ${M(vs.by)} over plan so far.`;
         await say(stack, [first, `Left this week: ${M(Math.max(0, p.left))}. Today: ${M(Math.max(0, p.todayLeft))}.`]);
         await card(stack, planCard(p));
       },
@@ -1185,14 +1218,14 @@ Swap.feature({
       async class(stack, it) {
         const f = api.facts(), sub = f.subwayMinutes, viable = sub != null && sub <= 30;
         const apps = rideApps(), cheap0 = apps[0];
-        // He already uses the ride app for nearly every ride: price it, but don't name it as a pick.
+        // Price the ride app, but name it as a pick only where rideAppSuggestOK().
         const cheap = cheap0 && !rideAppSuggestOK() && isRideApp(cheap0.app) ? Object.assign({}, cheap0, { app: "Ride" }) : cheap0;
         const s = api.swaps().find(x => x.id === "subway-am");
         const days = s && /tue.*thu/i.test(s.title) ? "Tue + Thu" : null;
         if (it.late) {
           await say(stack, [`Take the ride today${cheap ? `${cheap.app === "Ride" ? "," : `: ${esc(cheap.app)},`} about ${M(Math.round(cheap.median))}` : ""}.`,
             viable && s ? `${days ? `Subway ${days}` : esc(s.title)}? ${M(D.subway.fare)} a trip.` : ""]);
-          if (viable && s) actions(stack, [{ label: days ? `Add ${days}` : "Make it this week's swap", icon: "train", run: b => pickSwap(b, s, "Added") }]);
+          if (viable && s) actions(stack, [{ label: days ? `Add ${days}` : "Add to this week", icon: "train", run: b => pickSwap(b, s, "Added") }]);
           return;
         }
         if (sub == null) { await say(stack, ["No subway on your route."]); return; }
@@ -1203,7 +1236,7 @@ Swap.feature({
         const diff = Math.round(cheap.median) - D.subway.fare;
         await say(stack, [`Subway: ${M(D.subway.fare)}, about ${sub} min.`, `Ride: about ${M(Math.round(cheap.median))}, ${M(diff)} more a trip.`]);
         await card(stack, tripCard(sub, cheap));
-        if (s) actions(stack, [{ label: days ? `Add ${days}` : "Make it this week's swap", icon: "check", primary: true, run: b => pickSwap(b, s, "Added") }]);
+        if (s) actions(stack, [{ label: days ? `Add ${days}` : "Add to this week", icon: "check", primary: true, run: b => pickSwap(b, s, "Added") }]);
       },
 
       // Cheaper ride app. On the founder's build his ride app is recommended over Uber/Lyft.
@@ -1222,7 +1255,7 @@ Swap.feature({
         const s = api.swaps().find(x => x.rideApp || (x.kind === "move" && isRideApp(x.title)));
         if (s && rideAppOK()) {
           await card(stack, swapCard(s));
-          actions(stack, [{ label: "Make it this week's swap", icon: "check", primary: true, run: b => pickSwap(b, s) }]);
+          actions(stack, [{ label: "Add to this week", icon: "check", primary: true, run: b => pickSwap(b, s) }]);
         }
       },
 
@@ -1230,7 +1263,7 @@ Swap.feature({
         // "Why is it so high" with no week named: THIS week, from the live plan.
         if (plan() && it.scope !== "last" && !it.move) {
           const v = weekView("this"), p = v.plan, top = topCats(v.charges)[0];
-          await say(stack, [`This week so far: ${M(v.spent)}${p.today > 0 && p.aheadBy < -5 ? `, ${M(-p.aheadBy)} over plan` : ""}.`, top ? `Most of it: ${esc(top.cat.toLowerCase())}, ${M(top.total)}.` : ""]);
+          await say(stack, [`This week so far: ${M(v.spent)}${status(p) && status(p).state === "over" ? `, ${M(status(p).by)} over plan` : ""}.`, top ? `Most of it: ${esc(top.cat.toLowerCase())}, ${M(top.total)}.` : ""]);
           if (v.charges.length) await card(stack, listCard("This week", v.charges.slice().sort(byTime), 8));
           return;
         }
@@ -1273,12 +1306,12 @@ Swap.feature({
       },
 
       async save(stack) {
-        const list = api.swaps(), pick = store.get("deckPick");
-        const s = list.find(x => x.id !== pick) || list[0];
+        const list = api.swaps().filter(x => !x.sub), mine = myPicks().map(x => x.id);
+        const s = list.find(x => !mine.includes(x.id)) || list[0];
         if (!s) { await say(stack, ["No swap fits yet."]); return; }
         await say(stack, [`${esc(s.title)}.`, `About ${M(s.save)} ${unitOf(s)}.`]);
         await card(stack, swapCard(s));
-        actions(stack, [{ label: "Make it this week's swap", icon: "check", primary: true, run: b => pickSwap(b, s) }]);
+        actions(stack, [{ label: "Add to this week", icon: "check", primary: true, run: b => pickSwap(b, s) }]);
       },
 
       // "Save $50 a week" / "change my savings": sets the weekly save amount and the cap.
@@ -1287,15 +1320,17 @@ Swap.feature({
         const apply = n => {
           const cap = api.setSave(n);
           haptic("success");
-          return [`Saving ${M(T.saveTarget)} a week.`, `New cap: ${M(typeof cap === "number" ? cap : T.cap)}.`];
+          const bg = budget();
+          return bg && bg.scope === "all" ? [`Saving ${M(T.saveTarget)} a week.`, `New budget: ${M(bg.budget)}.`]
+            : [`Saving ${M(T.saveTarget)} a week.`, `New cap: ${M(typeof cap === "number" ? cap : T.cap)}.`];
         };
         if (it.amount != null) { await say(stack, apply(it.amount)); return; }
-        await say(stack, [`Saving ${M(T.saveTarget)} a week.`, `Cap: ${M(T.cap)}.`]);
+        { const bg = budget(); await say(stack, [`Saving ${M(T.saveTarget)} a week.`, bg && bg.scope === "all" ? `Budget: ${M(bg.budget)}.` : `Cap: ${M(T.cap)}.`]); }
         const max = U.total - ((T.payback && T.payback.perWeek) || 0);
         const opts = [50, 100, 150].filter(n => n <= max && n !== T.saveTarget);
         if (opts.length) actions(stack, opts.map((n, i) => ({ label: `Save ${money(n)}`, primary: i === 0, run: async b => {
           const lines = apply(n);
-          markDone(b, `Cap ${money(T.cap)}`);
+          { const bg = budget(); markDone(b, bg && bg.scope === "all" ? `Budget ${money(bg.budget)}` : `Cap ${money(T.cap)}`); }
           const st = turn("bot"); await say(st, lines);
         } })));
       },
@@ -1377,7 +1412,7 @@ Swap.feature({
           if (pending && pending.entry === last.entry) pending = null;
           await say(stack, ["Removed."]);
         } else if (last.kind === "pick") {
-          store.set("deckPick", last.prev || null);
+          if (SP()) { if (!last.had) SP().remove(api, last.id); } else store.set("deckPick", last.prev || null);
           await say(stack, [`Removed: ${esc(last.title)}.`]);
         }
         haptic();
