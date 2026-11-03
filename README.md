@@ -2,7 +2,7 @@
 
 Swap shows you where your money actually goes, gives you one number to spend today, and suggests cheaper swaps. It never blocks apps.
 
-I'm Michael, an econ student at NYU. I built this for myself and I use it on my iPhone every day. It started as a food delivery tracker and changed a lot once I looked at my real bank data. Feel free to clone it and make it yours.
+I go to NYU and found myself spending wayyy too much money, so I wanted to get to the root of it and figure out how to stop.
 
 [Early prototype](https://michaelwang.lol/swap/prototype/) · [Product notes](PRODUCT.md) · [Set it up](#set-it-up) · [How the code works](#how-the-code-works)
 
