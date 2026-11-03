@@ -101,7 +101,7 @@ python3 sync.py
 **4. Look at it in a browser.**
 
 ```bash
-python3 -m http.server 8744 -d app
+python3 -m http.server 8744 --bind 127.0.0.1 -d app
 ```
 
 Open [localhost:8744](http://localhost:8744). "You" is your data; the other two profiles are sample students.
