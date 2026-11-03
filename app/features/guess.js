@@ -208,6 +208,12 @@
 
     render(slot, api) {
       const { el, icon, money, store } = api;
+      // The founder's live build checks in every day, so nothing waits behind the guess: open the
+      // week without asking. The guess game stays for sample profiles.
+      if (api.data.live && !guessOf(api)) {
+        const wk = typeof api.weekKey === "function" ? api.weekKey() : api.data.weekStart;
+        store.set("guess", { week: wk, value: Math.round(api.data.thisWeek.total), auto: true });
+      }
       const self = this;
       const draw = () => {
         const D = api.data, t = D.thisWeek, g = guessOf(api);
@@ -234,7 +240,7 @@
           ${owed}
           ${g
             ? `<div class="list gw-links">
-                <button class="row gw-link" data-go="receipt"><span class="grow t-body">Receipt <span class="t-3 t-sub">· you guessed ${money(g.value)}</span></span>${icon("chevron", 18, 2.2)}</button></div>`
+                <button class="row gw-link" data-go="receipt"><span class="grow t-body">Receipt${g.auto ? "" : ` <span class="t-3 t-sub">· you guessed ${money(g.value)}</span>`}</span>${icon("chevron", 18, 2.2)}</button></div>`
             : `<button class="btn primary block gw-cta" data-go="guess">Guess your week</button>`}
         </section>`);
         node.querySelectorAll("[data-go]").forEach(b => b.addEventListener("click", () => { api.haptic(); self.open(api, b.dataset.go); }));

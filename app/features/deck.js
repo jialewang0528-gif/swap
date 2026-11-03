@@ -86,7 +86,7 @@ Swap.feature({
     const root = el(`<div class="dk">
       <div class="dk-area"></div>
       <p class="vh" aria-live="polite" data-sr></p>
-      <h2 class="section-title" id="dk-pick-h">This week's swap ${badge()}</h2>
+      <h2 class="section-title" id="dk-pick-h">This week's swaps ${badge()}</h2>
       <section class="card dk-pick" aria-labelledby="dk-pick-h"></section>
     </div>`);
     slot.appendChild(root);
@@ -98,22 +98,43 @@ Swap.feature({
 
     // ---------- this week's swap (below the deck) ----------
     let replaced = null;
+    // Every "yes" adds a swap to this week's list (store "deckPicks"); nothing is replaced.
+    // "deckPick" stays the first one, for the Week receipt, Move-in and Chat.
+    const picks = () => {
+      const l = (store.get("deckPicks") || []).filter(id => byId(id));
+      const one = pickId();
+      return one && byId(one) && !l.includes(one) ? [one].concat(l) : l;
+    };
+    const setPicks = ids => {
+      selfSet = true; store.set("deckPicks", ids); store.set("deckPick", ids[0] || null); selfSet = false;
+    };
+    // About how much a swap saves in a week: half as often as you do it now (at least once),
+    // a monthly cancel at its weekly share, a weekly swap as is.
+    const weekly = s => s.unit === "month" ? s.save * 12 / 52 : s.unit === "week" ? s.save
+      : typeof s.perWeek === "number" ? s.save * Math.max(1, Math.round(s.perWeek / 2)) : s.save;
     function renderPick() {
-      const s = pickSwap();
-      pickBox.innerHTML = s
-        ? `<div class="dk-pick-row">${mark(s, 40)}
-             <div class="grow"><p class="t-headline dk-pick-t">${esc(s.title)}</p>
-               <p class="t-sub t-2 dk-pick-a">About <span class="num">${money(s.save)}</span> ${per(s)}</p></div></div>
-           ${replaced ? `<p class="t-foot t-3 dk-pick-note">Replaced: ${esc(replaced)}</p>` : ""}`
-        : `<p class="t-sub t-2 dk-empty">No swap picked</p>`;
-      cards.forEach(c => c.classList.toggle("is-pick", c.dataset.id === pickId()));
+      const list = picks().map(byId).filter(Boolean);
+      const total = Math.round(list.reduce((t, s) => t + weekly(s), 0)), goal = api.data.thisWeek.saveTarget || 0;
+      pickBox.innerHTML = list.length
+        ? `<div class="dk-picks-sum"><span class="t-foot t-3">About</span> <b class="num">${money(total)}</b> <span class="t-foot t-3">a week${goal ? ` of your ${money(goal)} goal` : ""}</span></div>
+           <div class="list">${list.map(s => `<div class="row dk-pick-row">${mark(s, 36)}
+             <div class="grow"><p class="t-sub dk-pick-t">${esc(s.title)}</p>
+               <p class="t-foot t-3 dk-pick-a">About <span class="num">${money(s.save)}</span> ${per(s)}</p></div>
+             <button class="btn plain small dk-unpick" data-id="${esc(s.id)}" aria-label="Remove ${esc(s.title)}">Remove</button></div>`).join("")}</div>`
+        : `<p class="t-sub t-2 dk-empty">No swaps picked. Swipe right to add one.</p>`;
+      pickBox.querySelectorAll(".dk-unpick").forEach(b => b.addEventListener("click", () => {
+        haptic(); const s = byId(b.dataset.id);
+        setPicks(picks().filter(id => id !== b.dataset.id));
+        renderPick(); toast(`Removed: ${s ? s.title : "swap"}`);
+      }));
+      const ids = picks();
+      cards.forEach(c => c.classList.toggle("is-pick", ids.includes(c.dataset.id)));
     }
     function choose(s) {
-      const prev = pickSwap();
-      if (prev && prev.id === s.id) { toast(`Still this week's swap: ${s.title}`); return; }
-      replaced = prev ? prev.title : null;
-      selfSet = true; store.set("deckPick", s.id); selfSet = false;
-      toast(prev ? `Replaced. This week's swap: ${s.title}` : `This week's swap: ${s.title}`);
+      const ids = picks();
+      if (ids.includes(s.id)) { toast(`Already picked: ${s.title}`); return; }
+      setPicks(ids.concat(s.id));
+      toast(`Added: ${s.title}`);
       renderPick();
       if (!api.reduced) animate(pickBox, [{ opacity: .4 }, { opacity: 1 }], { preset: "snappy" });
     }
@@ -298,7 +319,7 @@ Swap.feature({
       const n = st.order.length, s = pickSwap();
       const node = el(`<div class="card dk-end">
         <h2 class="t-title3" data-title>All ${n} seen</h2>
-        <p class="t-sub t-2">${s ? `This week's swap: ${esc(s.title)}` : "No swap picked"}</p>
+        <p class="t-sub t-2">${picks().length ? `${picks().length} ${picks().length === 1 ? "swap" : "swaps"} picked this week` : "No swaps picked"}</p>
         <button class="btn secondary block dk-again">Look again</button></div>`);
       // If the deck is on screen, the end card lands in the stack under the last card as it
       // flies off, and focus moves to its heading right away.

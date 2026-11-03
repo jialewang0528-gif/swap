@@ -60,3 +60,7 @@
 @media (prefers-reduced-motion: reduce) {
   .dk-card { will-change: auto; }
 }
+/* This week's swaps: a running total, then every pick with a Remove. */
+.dk-picks-sum { padding: 0 var(--s-1) var(--s-1); }
+.dk-picks-sum b { font-size: 1.176rem; font-weight: 700; color: var(--accent-ink); }
+.dk-pick .list .row + .row { box-shadow: 0 -.5px 0 var(--hair); }
