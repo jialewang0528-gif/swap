@@ -106,6 +106,32 @@
       const bills = P.flex ? `<div class="td-bills"><span class="t-foot t-2">Bills this week</span><b class="num t-sub">${money(Math.round(P.bills))}</b></div>` : "";
       const weekLine = P.left < 0 ? `<span class="t-foot td-bad">Over budget by ${money(Math.round(-P.left))} this week</span>` : `<span class="t-foot t-2">${money(Math.round(P.left))} left</span>`;
       const status = S && P.today > 0 && !S.first ? S.text : "";
+      // Why "Left today" moved since the last time he looked (saved when the app goes to the
+      // background): new charges, a budget change, or both. Shown until the number settles.
+      const SNAP = "swapTodaySnap", leftNow = Math.round(P.todayLeft);
+      let why = "";
+      try {
+        const snap = JSON.parse(localStorage.getItem(SNAP) || "null");
+        if (snap && snap.date === T.date && !stale && Math.abs(leftNow - snap.left) >= 1) {
+          const seen = new Set(snap.ids || []);
+          const fresh2 = P.charges.filter(c => c.amount > 0 && !seen.has(c.id));
+          const newSum = Math.round(fresh2.reduce((t, c) => t + c.amount, 0));
+          const budgetMove = Math.round(P.cap - snap.budget);
+          const parts = [];
+          if (newSum) parts.push(`${fresh2.length === 1 ? esc(name(fresh2[0].merchant || fresh2[0].name)) : `${fresh2.length} new charges`} ${money(newSum)}`);
+          if (budgetMove) parts.push(`budget ${budgetMove > 0 ? "up" : "down"} ${money(Math.abs(budgetMove))}`);
+          if (!parts.length) parts.push("plan rebalanced");
+          const when = new Date(snap.at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+          why = `${leftNow < snap.left ? "Down" : "Up"} ${money(Math.abs(leftNow - snap.left))} since ${when}: ${parts.join(", ")}`;
+        }
+        const save = () => { try { localStorage.setItem(SNAP, JSON.stringify({ date: T.date, left: leftNow, budget: P.cap, ids: P.charges.map(c => c.id), at: Date.now() })); } catch (e) {} };
+        if (!snap || snap.date !== T.date) save();
+        // Re-arm when he leaves the app, so the next look compares against what he last saw.
+        const onHide = () => { if (document.visibilityState === "hidden") save(); };
+        document.addEventListener("visibilitychange", onHide);
+        addEventListener("pagehide", save);
+        slot._todaySnapOff = () => { document.removeEventListener("visibilitychange", onHide); removeEventListener("pagehide", save); };
+      } catch (e) {}
 
       slot.innerHTML = `
         <h2 class="section-title">Today <small>${esc(T.dow)}, ${esc(T.short)}</small></h2>
@@ -117,6 +143,7 @@
             <div class="td-today"><span class="t-foot t-3">${stale ? "Today's plan" : over ? "Over today" : "Left today"}</span>
               <b class="num td-big ${over ? "over" : ""}">${money(Math.round(stale ? T.plan : Math.abs(P.todayLeft)))}</b>
               <span class="t-foot ${stale ? "td-bad" : "t-2"}">${stale ? esc(staleLine) : `Spent ${money(Math.round(T.spent))} of ${money(T.plan)}`}</span>
+              ${why ? `<span class="t-foot td-why">${why}</span>` : ""}
               ${stale ? "" : `<div class="td-meter${over ? " over" : ""}" aria-hidden="true"><i style="width:${fill(T)}%"></i></div>`}</div>
             <div class="td-week"><span class="t-foot t-3">This week</span>
               <b class="num">${money(Math.round(P.spent))} <span class="t-3">of ${money(P.cap)}</span></b>
@@ -246,7 +273,7 @@
         slot.querySelectorAll(".td-day").forEach(x => x.setAttribute("aria-pressed", String(+x.dataset.i === sel)));
         listEl.innerHTML = dayList();
       }));
-      return () => removeEventListener("swap:cloud", onCloud);
+      return () => { removeEventListener("swap:cloud", onCloud); slot._todaySnapOff && slot._todaySnapOff(); };
     }
   });
 })();
