@@ -4,7 +4,7 @@ A money coach for college students that runs on your own bank data. It shows whe
 
 I built it for myself first (Michael Wang, NYU Economics) and it runs on my iPhone every day. It started as a delivery tracker and changed a few times once I looked at real data. Clone it and make it yours.
 
-**[Clickable prototype](https://michaelwang.lol/swap/prototype/)** · [Product record](PRODUCT.md) · [Set it up](#set-it-up-on-your-own-bank) · [How the code works](#how-the-code-works)
+**[Early prototype](https://michaelwang.lol/swap/prototype/)** (the first idea texted you; the real app uses notifications) · [Product record](PRODUCT.md) · [Set it up](#set-it-up-on-your-own-bank) · [How the code works](#how-the-code-works)
 
 ---
 
@@ -13,9 +13,9 @@ I built it for myself first (Michael Wang, NYU Economics) and it runs on my iPho
 - **Where your money goes.** Every dollar out of your bank over the last 10 weeks, ranked by category, plus the places that took the most.
 - **A daily plan.** Your usual week minus what you want to save, split across the days the way you actually spend (weekends get more). Spend extra on Monday and the rest of the week adjusts. Tap any day to see what you spent.
 - **By day.** Every transaction, money in and out.
-- **Swaps.** Cheaper options built from your own charges (subway instead of a daytime ride, pickup instead of delivery, one fewer bodega run, cancel a subscription), and how many of them it takes to hit your savings goal.
+- **Swaps.** Cheaper options built from your own charges (subway instead of a daytime ride, pickup instead of delivery, one fewer bodega run, cancel a subscription). Pick as many as you want each week and see how close they get you to your savings goal.
 - **Chat.** Ask "how much can I spend today" or "what do I spend the most on". On an iPhone with Apple Intelligence it answers on-device. Nothing leaves the phone.
-- **Updates itself.** Optional: a free private cloud link pulls fresh data from your bank every time you open the app.
+- **Updates itself and tells you.** Optional: a free private cloud link pulls fresh data from your bank every time you open the app, shows when your bank was last checked, and sends a notification when new charges land (iOS checks in the background a few times a day).
 
 Night rides count as spending but are never a swap target. Getting home safe isn't something to cut.
 

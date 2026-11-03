@@ -183,10 +183,11 @@ Swap.feature({
       const want = st.order.slice(st.i, st.i + 3);
       while (cards.length < want.length) {
         const c = cardFor(byId(want[cards.length]));
-        c.style.transform = POSE[2]; c.style.opacity = "0";
+        // Visible by default; the fade only animates. (An inline opacity of 0 waiting for the fade
+        // left cards invisible on iPhone whenever the fade was cancelled, and the deck went blank.)
+        c.style.transform = POSE[2]; c.style.opacity = "1";
         stack.appendChild(c); cards.push(c);
         if (moved && !api.reduced) animate(c, [{ opacity: 0 }, { opacity: 1 }], { preset: "gentle" });
-        else c.style.opacity = "1";
       }
       layout(moved);
     }
