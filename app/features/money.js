@@ -36,7 +36,7 @@
             <div><span class="t-foot t-3">Out, a week</span><b class="num mo-big">${money(A.outPerWeek)}</b></div>
             <div class="mo-in"><span class="t-foot t-3">In, a week</span><b class="num">${money(A.inPerWeek)}</b></div>
           </div>
-          <ol class="mo-list">${top.map((c, i) => `<li class="mo-cat">
+          <ol class="mo-list">${top.map((c, i) => `<li class="mo-cat tap-row" data-cat="${esc(c.cat)}" role="button" tabindex="0" aria-label="${esc(c.cat)}, ${money(c.perWeek)} a week. Show charges">
               <span class="mo-rank num t-foot t-3" aria-hidden="true">${i + 1}</span>
               <span class="mo-name"><span class="t-sub">${esc(c.cat)}</span><span class="t-foot t-3">${esc(note(c))}</span></span>
               <span class="mo-track" aria-hidden="true"><i class="${tone(c.cat)}" style="width:${Math.max(3, c.perWeek / max * 100)}%"></i></span>
@@ -47,8 +47,15 @@
               <span class="grow"><span class="t-sub mo-place">${esc(name(p.name))}</span><span class="t-foot t-3">${esc(p.cat)} · ${p.count} ${p.count === 1 ? "time" : "times"}</span></span>
               <span class="amt num">${money(p.total)}</span></div>`).join("")}</div>
           <button class="btn primary block mo-act">See swaps for these</button>
-          <p class="t-foot t-3 mo-fine">All money out of your bank except investing, last ${A.weeks} full weeks.</p>
+          <p class="t-foot t-3 mo-fine">All money out of your bank except investing, last ${A.weeks} full weeks. Tap a category to see its charges.</p>
         </div>`;
+      // Tap (or Enter / Space) a category row to see every charge in it.
+      const openable = (root, range) => root.querySelectorAll("[data-cat]").forEach(r => {
+        const go = () => { haptic(); window.SwapCategory && window.SwapCategory.open(api, r.dataset.cat, range); };
+        r.addEventListener("click", go);
+        r.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+      });
+      openable(slot, { from: A.from, to: A.to, title: `${fmt(A.from)} – ${fmt(A.to)}` });
       slot.querySelector(".mo-act").addEventListener("click", () => { haptic(); api.go("swaps"); });
     }
   });

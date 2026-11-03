@@ -10,3 +10,11 @@
 .pl-short { margin: 0; color: var(--food-ink); }
 .pl-fine { margin: 0; }
 .pl-all { padding: var(--s-1) var(--s-4); }
+.pl-gone { flex: none; margin-right: calc(-1 * var(--s-2)); }
+.pl-gone-note { margin: var(--s-2) 0 var(--s-1); }
+.pl-undo { background: none; border: 0; padding: 0; color: var(--ink); text-decoration: underline; font: inherit; cursor: pointer; }
+.pl-ask-btn { margin-bottom: var(--s-3); }
+.pl-ask { padding: var(--s-1) var(--s-4); margin-top: var(--s-3); }
+.pl-ask .grow { display: grid; }
+.pl-ask-row { cursor: pointer; }
+.pl-ask-box { width: 22px; height: 22px; accent-color: var(--ink); flex: none; }

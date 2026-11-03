@@ -42,7 +42,11 @@
     order: 2,
 
     render(slot, api) {
-      const swaps = api.swaps();
+      const self = this;
+      const { store } = api;
+      const gone = () => new Set(store.get("cancelledSubs") || []);
+      const subName = s => s.title.replace(/^Cancel /, "");
+      const swaps = api.swaps().filter(s => !s.sub || !gone().has(subName(s)));
       if (!swaps.some(s => typeof s.perWeek === "number")) return;
       const { esc, money, haptic } = api;
       const target = api.data.thisWeek.saveTarget || 0;
@@ -63,9 +67,12 @@
 
       slot.innerHTML = `
         <h2 class="section-title">All swaps <small>${all.length}</small></h2>
+        ${swaps.some(x => x.sub) || gone().size ? `<button class="btn tint block pl-ask-btn">Cancelled any subscriptions?</button>` : ""}
         <div class="card pl-all"><div class="list">${all.map(s => `<div class="row">${mark(s)}
             <span class="grow"><span class="t-sub pl-t">${esc(s.title)}</span><span class="t-foot t-3">${esc(String(s.basis || "").replace(/\s*→\s*/g, " vs "))}</span></span>
-            <span class="amt num">${money(s.save)}<span class="t-foot t-3"> ${s.sub ? "/mo" : esc(per(s).replace(/^an? /, "/"))}</span></span></div>`).join("")}</div></div>
+            <span class="amt num">${money(s.save)}<span class="t-foot t-3"> ${s.sub ? "/mo" : esc(per(s).replace(/^an? /, "/"))}</span></span>
+            ${s.sub ? `<button class="btn plain small pl-gone" data-name="${esc(subName(s))}" aria-label="Already cancelled ${esc(subName(s))}">Cancelled</button>` : ""}</div>`).join("")}</div>
+          ${gone().size ? `<p class="t-foot t-3 pl-gone-note">${gone().size} cancelled: ${esc([...gone()].join(", "))}. <button class="pl-undo t-foot">Undo all</button></p>` : ""}</div>
         <h2 class="section-title">Your goal <small>${money(target)} a week</small></h2>
         <div class="card pl">
           ${target > 0 ? `<div class="pl-head">
@@ -78,8 +85,40 @@
           <button class="btn tint block pl-goal">Change goal</button>
           <p class="t-foot t-3 pl-fine">Each swap at most half as often as you do it now. Night rides are never counted.</p>
         </div>`;
+      const redraw = () => { document.removeEventListener("swap:tab", onTab); slot.replaceChildren(); self.render(slot, api); };
+      slot.querySelectorAll(".pl-gone").forEach(b => b.addEventListener("click", () => {
+        haptic(); store.set("cancelledSubs", [...gone(), b.dataset.name]);
+        api.toast(`${b.dataset.name}: marked cancelled`, "check"); redraw();
+      }));
+      const undo = slot.querySelector(".pl-undo");
+      undo && undo.addEventListener("click", () => { haptic(); store.set("cancelledSubs", []); redraw(); });
+      // Ask which subscriptions are already cancelled: the bank can't tell (Apple bills to the end
+      // of the period). Asked once, the first time the Swaps tab opens; reopen from "Cancelled any?".
+      const askCancelled = () => {
+        const subs = ((window.SwapPrivate || {}).subscriptions || []).filter(x => x.active);
+        if (!subs.length) return;
+        const picked = gone();
+        api.sheet((body, close) => {
+          body.innerHTML = `<h2 class="t-title">Cancelled any of these?</h2>
+            <p class="t-sub t-2">Your bank keeps showing a subscription until its last bill. Check the ones you already cancelled.</p>
+            <div class="card pl-ask"><div class="list">${subs.map(x => `<label class="row pl-ask-row">
+              <span class="grow"><span class="t-sub">${esc(x.name)}</span><span class="t-foot t-3">${money(x.amount, 2)} ${x.freq === "yearly" ? "a year" : "a month"}</span></span>
+              <input type="checkbox" class="pl-ask-box" value="${esc(x.name)}"${picked.has(x.name) ? " checked" : ""}></label>`).join("")}</div></div>`;
+          api.sheetActions(body, [{ label: "Save", onClick: () => {
+            const names = [...body.querySelectorAll(".pl-ask-box:checked")].map(b => b.value);
+            store.set("cancelledSubs", names); store.set("askedCancelled", true);
+            api.toast(names.length ? `${names.length} marked cancelled` : "Nothing cancelled", "check");
+            close(); redraw();
+          } }]);
+        }, { label: "Cancelled subscriptions", onClose: () => store.set("askedCancelled", true) });
+      };
+      const ask = slot.querySelector(".pl-ask-btn");
+      ask && ask.addEventListener("click", () => { haptic(); askCancelled(); });
+      const onTab = e => { if (e.detail === "swaps" && !store.get("askedCancelled") && slot.isConnected) { store.set("askedCancelled", true); setTimeout(askCancelled, 450); } };
+      document.addEventListener("swap:tab", onTab);
       const g = slot.querySelector(".pl-goal");
       g && g.addEventListener("click", () => { haptic(); typeof api.openYou === "function" ? api.openYou("save") : api.go("week"); });
+      return () => document.removeEventListener("swap:tab", onTab);
     }
   });
   window.SwapPlan = { planFor };

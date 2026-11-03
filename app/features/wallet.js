@@ -29,7 +29,9 @@ Swap.feature({
       dispose = draw(slot, api);
     }
     build();
-    return () => { alive = false; document.removeEventListener("swap:facts", onFacts); dispose(); };
+    // A subscription marked "Cancelled" on the Swaps tab moves to Ended here right away.
+    const offGone = api.store.on("cancelledSubs", () => { if (alive) build(); });
+    return () => { alive = false; document.removeEventListener("swap:facts", onFacts); offGone && offGone(); dispose(); };
   }
 });
 
@@ -258,7 +260,9 @@ function subscriptions(host, api) {
   const D = api.data;
   const priv = api.privateData();
   const isReal = api.profile() === "you" && !!(priv && Array.isArray(priv.subscriptions) && priv.subscriptions.length);
-  const src = (isReal ? priv.subscriptions : (SAMPLE_SUBS[api.profile()] || [])).slice();
+  // Subscriptions marked "Cancelled" on the Swaps tab show as ended here.
+  const gone = new Set(store.get("cancelledSubs") || []);
+  const src = (isReal ? priv.subscriptions : (SAMPLE_SUBS[api.profile()] || [])).map(s => gone.has(s.name) ? Object.assign({}, s, { active: false, until: s.until || "2026-11" }) : s);
   // Memberships the profile pays for count in the same monthly total; add any the list lacks.
   (D.memberships || []).forEach(m => {
     if (!src.some(s => s.active && (s.name === m.name || (s.brand && new RegExp(s.brand, "i").test(m.name)))))

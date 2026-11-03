@@ -179,6 +179,7 @@ def whole_bank(txns, kinds, cancelled, last_week, this_monday, accounts):
     ins = defaultdict(float)
     places = defaultdict(lambda: [0.0, 0, ""])
     an_out = an_in = 0.0
+    history = []
     # The daily plan's shape for ALL spending: out by weekday over the last 8 full weeks.
     shape_start = last_week - timedelta(weeks=7)
     weekday = [0.0] * 7
@@ -195,6 +196,9 @@ def whole_bank(txns, kinds, cancelled, last_week, this_monday, accounts):
         wk = week_start(d)
         kind = kinds.get(t["transaction_id"])
         label = bank_label(t, section, kind)
+        if wk >= an_start:   # every charge behind the analysis (and this week), so a category can open
+            history.append({"d": d.isoformat(), "name": bank_name(t, kind), "amount": round(t["amount"], 2), "cat": label,
+                            "pending": bool(t.get("pending"))})
         if an_start <= wk <= last_week:
             if t["amount"] > 0 and section != "investing":
                 cats[label][0] += t["amount"]; cats[label][1] += 1
@@ -239,7 +243,8 @@ def whole_bank(txns, kinds, cancelled, last_week, this_monday, accounts):
         "places": sorted(({"name": n, "cat": v[2], "total": round(v[0]), "count": v[1]} for n, v in places.items()),
                          key=lambda x: -x["total"])[:15],
     }
-    return {"items": items, "weekly": series, "balances": balances, "analysis": analysis,
+    history.sort(key=lambda h: (h["d"], -abs(h["amount"])), reverse=True)
+    return {"items": items, "weekly": series, "balances": balances, "analysis": analysis, "history": history,
             "usualOut": round(sum(usual8) / len(usual8)) if usual8 else 0,
             "dayWeights": [round(x / sum(weekday), 4) for x in weekday] if sum(weekday) else [round(1 / 7, 4)] * 7}
 

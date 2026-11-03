@@ -142,7 +142,7 @@
             </div>
 
             <h3 class="section-title">By category <small>vs a usual week</small></h3>
-            <div class="card tw-cats">${cats.map(c => `<div class="tw-cat">
+            <div class="card tw-cats">${cats.map(c => `<div class="tw-cat tap-row" data-cat="${esc(c.cat)}" role="button" tabindex="0" aria-label="${esc(c.cat)}: ${money(c.spent)} this week. Show charges">
                 <span class="t-sub">${esc(c.cat)}</span>
                 <span class="num t-foot ${c.usual && c.spent > c.usual ? "tw-bad" : "t-2"}">${money(c.spent)}${c.usual ? ` of ${money(c.usual)}` : ""}</span>
                 <span class="tw-track" aria-hidden="true"><i class="${tone(c.cat)}${c.usual && c.spent > c.usual ? " over" : ""}" style="width:${c.usual ? Math.min(100, Math.round(c.spent / c.usual * 100)) : c.spent ? 100 : 0}%"></i></span>
@@ -163,6 +163,11 @@
             <div class="card tw-swaps"><div class="list">${swaps.map(x => `<div class="row"><span class="grow"><span class="t-sub td-tx">${esc(x.title)}</span><span class="t-foot t-3">${esc(x.detail || "")}</span></span>
               <span class="amt num">${money(x.save)}<span class="t-foot t-3"> ${esc((UNIT[x.unit] || "a " + x.unit).replace(/^an? /, "/"))}</span></span></div>`).join("")}</div></div>` : ""}
             <p class="t-foot t-3 tw-fine">${all ? "All money out of your bank, not investing. Usual = your last 10 weeks." : "Food and getting around."}${synced ? ` Bank synced ${esc(synced)}.` : ""}</p>`;
+          body.querySelectorAll("[data-cat]").forEach(r => {
+            const go = () => { haptic(); window.SwapCategory && window.SwapCategory.open(api, r.dataset.cat, { from: P.days[0].date, to: P.days[6].date, title: "This week" }); };
+            r.addEventListener("click", go);
+            r.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+          });
         }, { label: "This week in depth" });
       }
 

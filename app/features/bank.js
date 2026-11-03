@@ -54,7 +54,7 @@
       function draw() {
         const list = items(which), T = totals(list), max = Math.max(1, ...T.out.map(r => r.v));
         const swapOut = T.out.filter(r => toneOf(r.cat) !== "other").reduce((t, r) => t + r.v, 0);
-        const row = (r, sign) => `<div class="bk-cat" role="listitem">
+        const row = (r, sign) => `<div class="bk-cat tap-row" role="listitem" data-cat="${esc(r.cat)}" tabindex="0" aria-label="${esc(r.cat)}. Show charges">
             <span class="bk-name t-sub">${esc(r.cat)}</span>
             ${sign > 0 ? `<span class="bk-track" aria-hidden="true"><i class="${toneOf(r.cat)}" style="width:${Math.max(2, r.v / max * 100)}%"></i></span>` : ""}
             <span class="bk-amt num">${sign > 0 ? money(r.v) : `<span class="bk-in">+${money(r.v)}</span>`}</span></div>`;
@@ -81,6 +81,14 @@
           haptic(); which = b.dataset.w; store.set("bankWeek", which); draw();
           const f = slot.querySelector(`.bk-seg [data-w="${which}"]`); f && f.focus();
         }));
+      // Tap (or Enter / Space) a category row to see every charge in it.
+      const openable = (root, range) => root.querySelectorAll("[data-cat]").forEach(r => {
+        const go = () => { haptic(); window.SwapCategory && window.SwapCategory.open(api, r.dataset.cat, range); };
+        r.addEventListener("click", go);
+        r.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+      });
+        const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        openable(slot, { from: iso(dateOf(which, 0)), to: iso(dateOf(which, 6)), title: which === "last" ? "Last week" : "This week" });
         const all = slot.querySelector(".bk-all");
         all && all.addEventListener("click", () => { haptic(); openAll(); });
       }

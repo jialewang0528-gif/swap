@@ -396,3 +396,18 @@ h1, h2, h3, p { overflow-wrap: break-word; }
 .you-who { margin: 0; }
 .you-who .choice[aria-current="true"] .tick { background: var(--ink); color: #fff; box-shadow: none; }
 .you-again { margin-top: var(--s-6); }
+
+/* Category sheet (app/category.js): every charge in one category. */
+.cg-sum { display: flex; gap: var(--s-6); margin-top: var(--s-3); }
+.cg-sum > div { display: grid; gap: 2px; }
+.cg-sum b { font-size: 1.412rem; font-weight: 700; }
+.cg-in { color: var(--accent-ink); }
+.cg-day { margin-top: var(--s-5); }
+.cg-list { padding: var(--s-1) var(--s-4); }
+.cg-list .grow { display: grid; }
+.cg-name { overflow-wrap: anywhere; }
+/* A category row you can tap to open its charges. */
+.tap-row { cursor: pointer; -webkit-tap-highlight-color: transparent; border-radius: var(--r-well); transition: background var(--fade); }
+@media (hover: hover) { .tap-row:hover { background: var(--fill); } }
+.tap-row:active { background: var(--fill); }
+.tap-row:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }

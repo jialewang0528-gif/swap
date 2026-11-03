@@ -46,7 +46,8 @@ Swap.feature({
       const f = api.facts();
       const ranLate = api.charges().some(c => c.kind === "ride" && !c.night && c.tag === "late");
       const noSubway = f.subwayMinutes == null || f.subwayMinutes > 30 || ranLate;
-      return api.swaps().filter(s => !s.night && (rideOK(api) || !rideApp(api, `${s.title} ${s.detail} ${s.basis}`)) && !(noSubway && /subway|train/i.test(`${s.id} ${s.title}`))).map(adaptSwap);
+      // Cancelling a subscription isn't a weekly swap: those live in "All swaps" only.
+      return api.swaps().filter(s => !s.sub && !s.night && (rideOK(api) || !rideApp(api, `${s.title} ${s.detail} ${s.basis}`)) && !(noSubway && /subway|train/i.test(`${s.id} ${s.title}`))).map(adaptSwap);
     }
     let SWAPS = eligible();
     const byId = id => SWAPS.find(s => s.id === id);
