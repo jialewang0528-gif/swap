@@ -9,4 +9,4 @@ mkdir -p "$HOME/Library/LaunchAgents" "$ROOT/data"
 sed -e "s#__ROOT__#$ROOT#g" -e "s#<string>lol.michaelwang.swap.morning</string>#<string>$LABEL</string>#" "$ROOT/scripts/swap.morning.plist" > "$DEST"
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$DEST"
-echo "Installed. Runs daily at 7:30am. Log: data/morning.log"
+echo "Installed. Runs daily at 7:30 AM and 11 PM. Log: data/morning.log"

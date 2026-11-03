@@ -117,3 +117,4 @@
 .td-new-row { display: flex; justify-content: space-between; gap: var(--s-3); }
 .td-new-row span:first-child { min-width: 0; overflow-wrap: anywhere; }
 .td-why { color: var(--ink-2); font-weight: 600; }
+.td-expiry { margin: 0; padding: var(--s-2) var(--s-3); border-radius: var(--r-tile); background: var(--food-soft); color: var(--food-ink); font-weight: 600; }

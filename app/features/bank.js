@@ -44,7 +44,7 @@
       }
 
       const C = window.SwapCategory || {};
-      const txRow = (i, o) => C.txRow ? C.txRow(api, { name: i.name, amount: i.amount, cat: i.cat, time: i.time, pending: i.pending, tone: toneOf(i.cat) }, o)
+      const txRow = (i, o) => C.txRow ? C.txRow(api, { name: i.name, amount: i.amount, cat: i.cat, time: i.time, pending: i.pending, hold: i.hold, tone: toneOf(i.cat) }, o)
         : `<div class="tx-row"><span></span><span class="tx-main"><b class="t-sub tx-name">${esc(name(i.name))}</b></span><span class="tx-amt num">${money(i.amount, 2)}</span></div>`;
       let moreOpen = false;
 

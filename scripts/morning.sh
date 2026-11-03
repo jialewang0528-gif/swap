@@ -38,9 +38,17 @@ xcodebuild -project ios/Swap.xcodeproj -scheme Swap -configuration Debug \
   -destination "id=$DEVICE" -derivedDataPath ios/build -allowProvisioningUpdates \
   DEVELOPMENT_TEAM="$TEAM" ${BUNDLE:+PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE"} build -quiet || { echo "build failed"; exit 1; }
 
-if xcrun devicectl list devices 2>/dev/null | grep -q "$DEVICE.*connected"; then
-  xcrun devicectl device install app --device "$DEVICE" ios/build/Build/Products/Debug-iphoneos/Swap.app \
-    && echo "installed" || echo "install failed"
+# Plugged in ("connected") or on the same Wi-Fi after pairing ("available"): install. Over Wi-Fi the
+# phone must be unlocked recently and on the same network; a failed try is retried at the next run.
+STATE="$(xcrun devicectl list devices 2>/dev/null | grep "$DEVICE" || true)"
+if echo "$STATE" | grep -qE "connected|available"; then
+  for try in 1 2; do
+    if xcrun devicectl device install app --device "$DEVICE" ios/build/Build/Products/Debug-iphoneos/Swap.app >/dev/null 2>&1; then
+      echo "installed ($(echo "$STATE" | grep -q connected && echo cable or Wi-Fi || echo Wi-Fi))"; break
+    fi
+    [ $try = 2 ] && echo "install failed (phone locked or off this Wi-Fi?)"
+    sleep 20
+  done
 else
   echo "phone not reachable (not on the same Wi-Fi or USB); data synced, install skipped"
 fi

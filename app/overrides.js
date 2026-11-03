@@ -80,6 +80,14 @@
     return Object.values(by).filter(q => q.total >= 50).sort((a, b) => b.total - a.total);
   }
 
+  // Tell the iPhone app (morning number) about his categories and the budget base they produce.
+  function toNative() {
+    const B = window.SwapLive && window.SwapLive.bank, h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.notify;
+    if (!B || !h) return;
+    const map = read(KEY);
+    try { h.postMessage({ type: "overrides", map, flexUsual: Object.keys(map).length && B.flex ? B.flex.usual : null, dayWeights: Object.keys(map).length && B.flex ? B.flex.dayWeights : null }); } catch (e) {}
+  }
+
   window.SwapOverrides = {
     CHOICES, FIXED, keyOf,
     get: (name, cat) => read(KEY)[keyOf(name, cat)] || null,
@@ -92,4 +100,5 @@
     reload() { try { sessionStorage.setItem("swapPlaceKeep", "1"); } catch (e) {} location.reload(); },
   };
   apply();
+  toNative();
 })();

@@ -163,7 +163,7 @@ def to_row(person, txn, kind):
     """Keep only the fields the pilot needs. No account numbers, no locations."""
     # Many banks don't send a time of day; then hour_ny is left blank.
     when = txn.get("authorized_datetime") or txn.get("datetime")
-    hour = datetime.fromisoformat(when.replace("Z", "+00:00")).astimezone(NYC).hour if when else ""
+    hour = parse_time(when).astimezone(NYC).hour if when else ""
     day = date.fromisoformat(txn.get("authorized_date") or txn["date"])
     return {
         "person": person,
@@ -198,6 +198,13 @@ def load_env():
     if not os.environ.get("PLAID_CLIENT_ID") or not os.environ.get("PLAID_SECRET"):
         sys.exit("PLAID_CLIENT_ID and PLAID_SECRET must be set in .env")
     return env
+
+
+def parse_time(s):
+    """Plaid's ISO times, which may carry a fraction of a second of any length ("...36.2Z") that
+    Python 3.9's fromisoformat refuses. Returns an aware datetime."""
+    s = re.sub(r"\.\d+", "", s.replace("Z", "+00:00"))
+    return datetime.fromisoformat(s)
 
 
 def plaid(path, body):

@@ -43,6 +43,9 @@ struct SwapApp: App {
 //   {action: "schedule", sunday: true, daily: true}  unchanged API: sunday = Sunday 6 PM "Plan next week",
 //                                                    daily = the 8:30 AM morning number ("Today: $X").
 //   {action: "cancel"}                               unchanged: turns every reminder off.
+//   {type: "overrides", map: {"name|bankCat": cat}, flexUsual: N, dayWeights: [7]}
+//                                                    his own categories (app/overrides.js) and the budget base
+//                                                    they produce, so the morning number matches the app.
 // bank.items[].id is stable from pending to posted (sync.py stable_id), so a charge notifies once.
 // Pending ride-app holds (hold: true) never notify; the final ride charge does when it posts.
 enum BankWatch {
@@ -52,11 +55,64 @@ enum BankWatch {
     private static let notifiedKey = "swap.notifiedItems"  // ids already in a notification
     private static let versionKey = "swap.bankWatchVersion"
     private static let fetchedKey = "swap.lastFetch"
+    static let bgRunKey = "swap.bgLastRun"
+    static let overridesKey = "swap.overrides"
+    static let flexKey = "swap.flexOverride"
+
+    static func setOverrides(_ body: [String: Any]) {
+        let d = UserDefaults.standard
+        d.set(body["map"] as? [String: String] ?? [:], forKey: overridesKey)
+        if let u = (body["flexUsual"] as? NSNumber)?.doubleValue, let w = (body["dayWeights"] as? [NSNumber])?.map(\.doubleValue), w.count == 7 {
+            d.set(["usual": u, "dayWeights": w], forKey: flexKey)
+        } else { d.removeObject(forKey: flexKey) }
+        Morning.reschedule(live: latest())
+    }
+
+    // Same key as app/overrides.js keyOf(name, cat): lowercase, non-alphanumerics to one space, "|" + bank category.
+    static func overrideKey(_ name: String, _ cat: String) -> String {
+        let n = name.lowercased().replacingOccurrences(of: "[^a-z0-9]+", with: " ", options: .regularExpression).trimmingCharacters(in: .whitespaces)
+        return n + "|" + cat
+    }
+
+    // What the page needs to know about the app itself: when this build stops opening (free signing
+    // lasts 7 days) and when the last background check ran.
+    static func nativeInfo() -> [String: Any] {
+        var info: [String: Any] = [:]
+        let iso = ISO8601DateFormatter()
+        if let exp = provisionExpiry() { info["expires"] = iso.string(from: exp) }
+        if let bg = UserDefaults.standard.object(forKey: bgRunKey) as? Date { info["bgLastRun"] = iso.string(from: bg) }
+        if let f = UserDefaults.standard.object(forKey: fetchedKey) as? Date { info["lastFetch"] = iso.string(from: f) }
+        return info
+    }
+
+    // ExpirationDate from the build's embedded provisioning profile (a plist inside a signed blob).
+    static func provisionExpiry() -> Date? {
+        guard let url = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"),
+              let data = try? Data(contentsOf: url), let text = String(data: data, encoding: .isoLatin1),
+              let start = text.range(of: "<?xml"), let end = text.range(of: "</plist>") else { return nil }
+        let xml = Data(text[start.lowerBound..<end.upperBound].utf8)
+        let plist = try? PropertyListSerialization.propertyList(from: xml, format: nil) as? [String: Any]
+        return plist?["ExpirationDate"] as? Date
+    }
+
+    // A reminder the evening before the build expires: plug in so the morning job can renew it.
+    static func scheduleExpiryReminder() {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: ["swap.expiry"])
+        guard let exp = provisionExpiry(), let remind = Calendar.current.date(byAdding: .hour, value: -20, to: exp), remind > Date() else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Swap needs a renewal"
+        content.body = "Plug your iPhone into your Mac tonight so tomorrow's 7:30 AM update can renew it."
+        content.sound = .default
+        let when = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: remind)
+        center.add(UNNotificationRequest(identifier: "swap.expiry", content: content, trigger: UNCalendarNotificationTrigger(dateMatching: when, repeats: false)))
+    }
     private static let keep = 600
     private static let lock = NSLock()
 
     static func register() {
         BGTaskScheduler.shared.register(forTaskWithIdentifier: taskID, using: nil) { task in
+            UserDefaults.standard.set(Date(), forKey: bgRunKey)
             schedule()
             let once = Once()
             let finish: (Bool) -> Void = { ok in once.run { task.setTaskCompleted(success: ok) } }
@@ -65,6 +121,7 @@ enum BankWatch {
         }
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
         Notifications.migrate()
+        scheduleExpiryReminder()
     }
 
     static func schedule() {
@@ -230,9 +287,13 @@ enum Morning {
     }
 
     static func plan(live: [String: Any], on day: Date, saveTarget: Double) -> Plan? {
+        // His own categories (sent by the page) change what counts as flexible, and the budget base.
+        let d = UserDefaults.standard
+        let mine = d.dictionary(forKey: BankWatch.overridesKey) as? [String: String] ?? [:]
+        let mineFlex = d.dictionary(forKey: BankWatch.flexKey)
         guard let bank = live["bank"] as? [String: Any], let flex = bank["flex"] as? [String: Any],
-              let usual = (flex["usual"] as? NSNumber)?.doubleValue,
-              let w = (flex["dayWeights"] as? [NSNumber])?.map(\.doubleValue), w.count == 7,
+              let usual = (mineFlex?["usual"] as? NSNumber)?.doubleValue ?? (flex["usual"] as? NSNumber)?.doubleValue,
+              let w = ((mineFlex?["dayWeights"] as? [NSNumber]) ?? (flex["dayWeights"] as? [NSNumber]))?.map(\.doubleValue), w.count == 7,
               let items = bank["items"] as? [[String: Any]],
               let ws = (live["current"] as? [String: Any])?["weekStart"] as? String,
               let start = localDay(ws) else { return nil }
@@ -240,7 +301,12 @@ enum Morning {
         guard let t = cal.dateComponents([.day], from: start, to: cal.startOfDay(for: day)).day, (0...6).contains(t) else { return nil }
         let budget = max(0, usual - saveTarget)
         var spent = [Double](repeating: 0, count: 7)
-        for i in items where (i["week"] as? String) == "now" && (i["fixed"] as? Bool) != true && (i["cat"] as? String) != "Investing" {
+        let fixedCats: Set<String> = ["Subscriptions", "Phone & bills", "Rent", "Loan payments", "Bank fees"]
+        for i in items where (i["week"] as? String) == "now" {
+            let bankCat = i["cat"] as? String ?? ""
+            let cat = mine[BankWatch.overrideKey(i["name"] as? String ?? "", bankCat)] ?? bankCat
+            let fixed = mine[BankWatch.overrideKey(i["name"] as? String ?? "", bankCat)] != nil ? fixedCats.contains(cat) : ((i["fixed"] as? Bool) == true)
+            guard !fixed, cat != "Investing" else { continue }
             let a = (i["amount"] as? NSNumber)?.doubleValue ?? 0
             guard a > 0, let d = (i["day"] as? NSNumber)?.intValue, (0..<7).contains(d) else { continue }
             spent[d] += a
@@ -314,7 +380,7 @@ struct SwapWebView: UIViewRepresentable {
         config.userContentController.add(context.coordinator, name: "ask")
         // Tell the page, before any script runs, whether the on-device model can answer.
         config.userContentController.addUserScript(WKUserScript(
-            source: "window.SwapNative = Object.assign(window.SwapNative || {}, { ai: \(Bridge.jsString(AskSwap.status())) });",
+            source: "window.SwapNative = Object.assign(window.SwapNative || {}, { ai: \(Bridge.jsString(AskSwap.status())), app: \(Bridge.jsonString(BankWatch.nativeInfo())) });",
             injectionTime: .atDocumentStart, forMainFrameOnly: true))
 
         let web = WKWebView(frame: .zero, configuration: config)
@@ -356,6 +422,10 @@ struct SwapWebView: UIViewRepresentable {
         }
 
         // A Swift string as a JS string literal (JSON-escaped).
+        static func jsonString(_ v: Any) -> String {
+            guard let d = try? JSONSerialization.data(withJSONObject: v), let s = String(data: d, encoding: .utf8) else { return "{}" }
+            return s
+        }
         static func jsString(_ s: String) -> String {
             guard let data = try? JSONSerialization.data(withJSONObject: [s]),
                   let json = String(data: data, encoding: .utf8) else { return "\"\"" }
@@ -398,6 +468,8 @@ struct SwapWebView: UIViewRepresentable {
                 case "plan":
                     if let n = (body["saveTarget"] as? NSNumber)?.doubleValue { BankWatch.setSaveTarget(n) }
                     return
+                case "overrides":
+                    BankWatch.setOverrides(body); return
                 default: break
                 }
                 if (body["action"] as? String) == "cancel" { Notifications.cancelAll(); return }

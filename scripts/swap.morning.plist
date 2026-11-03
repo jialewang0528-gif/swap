@@ -8,9 +8,12 @@
     <string>/bin/zsh</string>
     <string>__ROOT__/scripts/morning.sh</string>
   </array>
-  <!-- Every day at 7:30 am; if the Mac is asleep then, it runs when it wakes. -->
+  <!-- Every day at 7:30 am and 11 pm (a second chance to reach the phone at home); a missed run happens when the Mac wakes. -->
   <key>StartCalendarInterval</key>
-  <dict><key>Hour</key><integer>7</integer><key>Minute</key><integer>30</integer></dict>
+  <array>
+    <dict><key>Hour</key><integer>7</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>23</integer><key>Minute</key><integer>0</integer></dict>
+  </array>
   <key>StandardOutPath</key><string>__ROOT__/data/launchd.out</string>
   <key>StandardErrorPath</key><string>__ROOT__/data/launchd.err</string>
 </dict>

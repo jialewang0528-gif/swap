@@ -70,7 +70,7 @@
       const CAT = window.SwapCategory;
       const billNote = `<span class="t-3"> · Bill, not in plan</span>`;
       const chargeRow = c => CAT && typeof CAT.txRow === "function"
-        ? CAT.txRow(api, { name: c.merchant, amount: c.amount, cat: c.cat, time: c.time, pending: c.pending, tone: c.kind ? api.kindOf(c) : undefined }, { cents: true, meta: c.fixed ? billNote : "" })
+        ? CAT.txRow(api, { name: c.merchant, amount: c.amount, cat: c.cat, time: c.time, pending: c.pending, hold: c.hold, tone: c.kind ? api.kindOf(c) : undefined }, { cents: true, meta: c.fixed ? billNote : "" })
         : `<div class="row"><span class="grow"><span class="t-sub td-tx">${esc(name(c.merchant))}</span><span class="t-foot t-3">${esc(c.cat || "")}${c.time ? ` · ${clock(c.time)}` : ""}${c.pending ? " · Pending" : ""}${c.fixed ? " · Bill, not in plan" : ""}</span></span>
           <span class="amt num">${c.amount < 0 ? `<span class="td-in">+${money(-c.amount, 2)}</span>` : money(c.amount, 2)}</span></div>`;
 
@@ -135,9 +135,19 @@
         slot._todaySnapOff = () => { document.removeEventListener("visibilitychange", onHide); removeEventListener("pagehide", save); };
       } catch (e) {}
 
+      // The iPhone app tells us when this build stops opening (free Apple signing lasts 7 days) and
+      // when the background check last ran (SwapApp.swift nativeInfo).
+      const app = (window.SwapNative && window.SwapNative.app) || {};
+      const expires = app.expires ? new Date(app.expires) : null;
+      const daysLeft = expires ? (expires - Date.now()) / 864e5 : null;
+      const expiryLine = daysLeft != null && daysLeft < 2.5
+        ? `Swap stops opening ${expires.toLocaleDateString("en-US", { weekday: "long" })} ${expires.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}. Plug your iPhone into your Mac so the 7:30 AM update renews it.`
+        : "";
+      const bgLine = app.bgLastRun ? `Background check last ran ${new Date(app.bgLastRun).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" })}.` : "";
       slot.innerHTML = `
         <h2 class="section-title">Today <small>${esc(T.dow)}, ${esc(T.short)}</small></h2>
         <div class="card td">
+          ${expiryLine ? `<p class="td-expiry t-foot" role="status">${esc(expiryLine)}</p>` : ""}
           <div class="td-sync t-foot"><span class="td-dot" aria-hidden="true"></span><span class="td-sync-t" role="status">${esc(syncText(window.SwapCloud && window.SwapCloud.status()))}</span>
             ${window.SwapCloud ? `<button class="btn plain small td-check">Check bank</button>` : ""}</div>
           ${fresh.length ? `<div class="td-new"><b class="t-foot">New since last check</b>${fresh.slice(0, 4).map(i => `<div class="td-new-row t-sub"><span>${esc(name(i.name))}</span><span class="num${i.amount < 0 ? " td-in" : ""}">${amt(i)}</span></div>`).join("")}${fresh.length > 4 ? `<span class="t-foot t-3">and ${fresh.length - 4} more</span>` : ""}</div>` : ""}
@@ -231,7 +241,7 @@
             ${swaps.length ? `<h3 class="section-title">Biggest swaps</h3>
             <div class="card tw-swaps"><div class="list">${swaps.map(x => `<div class="row"><span class="grow"><span class="t-sub td-tx">${esc(x.title)}</span><span class="t-foot t-3">${esc(x.detail || "")}</span></span>
               <span class="amt num">${money(x.save)}<span class="t-foot t-3"> ${esc((UNIT[x.unit] || "a " + x.unit).replace(/^an? /, "/"))}</span></span></div>`).join("")}</div></div>` : ""}
-            <p class="t-foot t-3 tw-fine">${all ? `${P.flex ? "Bills and subscriptions are not in the daily plan." : "All money out of your bank, not investing."}${tenWeeks ? " Usual = your last 10 weeks." : ""}` : "Food and getting around."}</p>`;
+            <p class="t-foot t-3 tw-fine">${all ? `${P.flex ? "Bills and subscriptions are not in the daily plan." : "All money out of your bank, not investing."}${tenWeeks ? " Usual = your last 10 weeks." : ""}` : "Food and getting around."}${bgLine ? " " + esc(bgLine) : ""}</p>`;
           body.querySelectorAll("[data-cat]").forEach(r => {
             const go = () => { haptic(); window.SwapCategory && window.SwapCategory.open(api, r.dataset.cat, { from: P.days[0].date, to: P.days[6].date, title: "This week" }); };
             r.addEventListener("click", go);

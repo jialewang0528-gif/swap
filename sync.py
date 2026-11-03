@@ -361,7 +361,7 @@ def whole_bank(txns, kinds, cancelled, last_week, this_monday, accounts, posted=
                 w["in"] += -t["amount"]
         if wk >= last_week:
             when = t.get("authorized_datetime") or t.get("datetime")
-            hhmm = datetime.fromisoformat(when.replace("Z", "+00:00")).astimezone(pull.NYC).strftime("%H:%M") if when else None
+            hhmm = pull.parse_time(when).astimezone(pull.NYC).strftime("%H:%M") if when else None
             items.append({"id": sid, "week": "last" if wk == last_week else "now",
                           "day": (d - wk).days, "time": hhmm, "name": name, "amount": round(t["amount"], 2),
                           "cat": label, "swap": bool(kind), "pending": bool(t.get("pending")),
@@ -616,7 +616,7 @@ def build_live(token, logos=True):
             continue
         d = date.fromisoformat(t.get("authorized_date") or t["date"])
         when = t.get("authorized_datetime") or t.get("datetime")
-        hhmm = datetime.fromisoformat(when.replace("Z", "+00:00")).astimezone(pull.NYC).strftime("%H:%M") if when else None
+        hhmm = pull.parse_time(when).astimezone(pull.NYC).strftime("%H:%M") if when else None
         merchant = clean_name(display_merchant(t, kind), posted_names)
         rows.append({"date": d, "time": hhmm, "kind": kind, "amount": round(t["amount"], 2),
                      "merchant": merchant, "id": stable_id(t), "pending": bool(t.get("pending")),
@@ -737,7 +737,7 @@ def build_live(token, logos=True):
     try:
         st = (pull.plaid("/item/get", {"access_token": token}).get("status") or {}).get("transactions") or {}
         when = st.get("last_successful_update")
-        live["bankCheckedAt"] = datetime.fromisoformat(when.replace("Z", "+00:00")).astimezone(pull.NYC).replace(tzinfo=None).isoformat(timespec="minutes") if when else None
+        live["bankCheckedAt"] = pull.parse_time(when).astimezone(pull.NYC).replace(tzinfo=None).isoformat(timespec="minutes") if when else None
     except SystemExit:
         live["bankCheckedAt"] = None
     return live

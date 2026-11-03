@@ -27,3 +27,7 @@
 .pl-ask .grow { display: grid; }
 .pl-ask-row { display: flex; align-items: center; gap: var(--s-3); width: 100%; min-height: var(--tap); cursor: pointer; }
 .pl-ask-box { width: 22px; height: 22px; accent-color: var(--ink); flex: none; }
+.pl-daytime { margin-bottom: var(--s-3); }
+.pl-step { display: flex; align-items: center; justify-content: center; gap: var(--s-4); margin-top: var(--s-3); }
+.pl-step .btn { min-width: 56px; font-size: 1.412rem; }
+.pl-n { font-size: 2.353rem; font-weight: 700; min-width: 2ch; text-align: center; }

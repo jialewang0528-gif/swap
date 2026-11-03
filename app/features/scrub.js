@@ -74,7 +74,7 @@
         const B = api.profile() === "you" && window.SwapLive && window.SwapLive.bank;
         if (B && Array.isArray(B.items)) {
           B.items.filter(i => i.week === "last" && !i.swap).forEach(i => charges.push({ id: "bk-" + i.id, day: i.day, time: i.time,
-            merchant: i.name, amount: i.amount, kind: "other", cat: i.cat, pending: i.pending }));
+            merchant: i.name, amount: i.amount, kind: "other", cat: i.cat, pending: i.pending, hold: i.hold }));
         }
       };
       const groupOf = c => c.kind === "other" ? "other" : api.kindOf(c);   // food | move | night | other
@@ -209,7 +209,7 @@
         const catOf = c => c.cat || bankCat.get(c.id) || (C.KIND_CAT || {})[c.kind] || GROUP_LABEL[groupOf(c)];
         // One row style for every transaction list (category.js txRow): mark, name, "Category · time", amount.
         const txRow = (c, o) => C.txRow
-          ? el(C.txRow(api, { name: c.merchant, amount: c.amount, cat: catOf(c), time: c.time, pending: c.pending,
+          ? el(C.txRow(api, { name: c.merchant, amount: c.amount, cat: catOf(c), time: c.time, pending: c.pending, hold: c.hold,
               tone: c.kind === "other" ? "other" : groupOf(c) }, Object.assign({ tag: "li", cls: "sc-row", attrs: `data-id="${esc(c.id)}"` }, o)))
           : el(`<li class="sc-row tx-row" data-id="${esc(c.id)}"><span></span><span class="tx-main"><b class="t-sub tx-name">${esc(displayName(api, c.merchant))}</b></span><span class="tx-amt num">${money(c.amount)}</span></li>`);
         function rowFor(c) {

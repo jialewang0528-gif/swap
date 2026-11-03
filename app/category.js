@@ -35,7 +35,7 @@
   }
   function txRow(api, t, o = {}) {
     const { esc, money } = api, inn = t.amount < 0, d = o.cents ? 2 : 0;
-    const meta = [t.cat ? esc(t.cat) : "", t.time ? `<span class="num">${clock(t.time)}</span>` : "", t.pending ? "Pending" : ""].filter(Boolean).join(" · ");
+    const meta = [t.cat ? esc(t.cat) : "", t.time ? `<span class="num">${clock(t.time)}</span>` : "", t.hold ? "Pending, estimate" : t.pending ? "Pending" : ""].filter(Boolean).join(" · ");
     const tag = o.tag || "div";
     return `<${tag} class="tx-row${o.cls ? " " + o.cls : ""}"${o.attrs ? " " + o.attrs : ""}>${txMark(api, t)}
       <span class="tx-main"><b class="t-sub tx-name">${o.prefix ? `<span class="vh">${esc(o.prefix)}: </span>` : ""}${esc(txName(api, t.name))}</b>${meta || o.meta ? `<span class="tx-meta t-foot">${meta ? `<span class="t-3">${meta}</span>` : ""}${o.meta || ""}</span>` : ""}</span>
@@ -62,7 +62,7 @@
         </div>
         ${days.map(d => `<h3 class="section-title cg-day">${esc(day(d))}</h3>
           <div class="card cg-list"><div class="list">${list.filter(h => h.d === d).map(h =>
-            txRow(api, { name: h.name, amount: h.amount, pending: h.pending, time: h.time, tone: toneOf(cat) },
+            txRow(api, { name: h.name, amount: h.amount, pending: h.pending, hold: h.hold, time: h.time, tone: toneOf(cat) },
               { cents: true, cls: "tap-row tx-fix", attrs: `role="button" tabindex="0" data-name="${esc(h.name)}" data-bank="${esc(h.bankCat || h.cat)}" aria-label="${esc(txName(api, h.name))}, ${money(Math.abs(h.amount), 2)}. Change category"` })).join("")}</div></div>`).join("")}
         ${window.SwapOverrides ? `<p class="t-foot t-3 cg-hint">Wrong category? Tap a charge to change it.</p>` : ""}`;
       body.querySelectorAll(".tx-fix").forEach(r => {

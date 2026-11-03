@@ -76,6 +76,7 @@
 
         slot.innerHTML = `
           <h2 class="section-title">All swaps <small>${all.length}</small></h2>
+          ${(() => { const sw = all.find(x => x.id === "subway-day"); return sw ? `<button class="btn tint block pl-daytime">${sw.yours ? `Daytime rides: ${sw.perWeek} a week · Change` : `Daytime rides are a guess (about ${Math.round(sw.perWeek)} a week) · Set yours`}</button>` : ""; })()}
           <div class="card pl-all">
             <ul class="list" role="list">${weekly.map(swapRow).join("")}</ul>
             ${hasSubs ? `<button class="pl-ask-btn" data-k="ask">
@@ -116,6 +117,27 @@
         });
         const ask = slot.querySelector(".pl-ask-btn");
         ask && ask.addEventListener("click", () => { haptic(); askCancelled(); });
+        // How many rides a week are in the daytime: the bank sends no times, so he can say.
+        const day = slot.querySelector(".pl-daytime");
+        day && day.addEventListener("click", () => {
+          haptic();
+          const sw = all.find(x => x.id === "subway-day");
+          let n = Math.round(sw ? sw.perWeek : 3);
+          api.sheet((body, close) => {
+            body.innerHTML = `<h2 class="t-title">Daytime rides</h2>
+              <p class="t-sub t-2">About how many of your rides a week are in the daytime? Night rides (11 PM to 6 AM) never count as a swap.</p>
+              <div class="card pl-step"><button class="btn tint pl-minus" aria-label="Fewer">−</button>
+                <b class="num pl-n" role="status">${n}</b><span class="t-foot t-3">a week</span>
+                <button class="btn tint pl-plus" aria-label="More">+</button></div>`;
+            const out = body.querySelector(".pl-n"), setN = v => { n = Math.max(0, Math.min(30, v)); out.textContent = n; };
+            body.querySelector(".pl-minus").addEventListener("click", () => { haptic(); setN(n - 1); });
+            body.querySelector(".pl-plus").addEventListener("click", () => { haptic(); setN(n + 1); });
+            api.sheetActions(body, [{ label: "Save", onClick: () => {
+              try { localStorage.setItem("swapDaytimeRides", String(n)); } catch (e) {}
+              close(); api.toast(`Daytime rides: ${n} a week`, "check"); setTimeout(() => location.reload(), 350);
+            } }]);
+          }, { label: "Daytime rides" });
+        });
         const g = slot.querySelector(".pl-goal");
         g && g.addEventListener("click", () => { haptic(); typeof api.openYou === "function" ? api.openYou("save") : api.go("week"); });
         if (key) refocus(key);

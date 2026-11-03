@@ -171,7 +171,15 @@
             basis: `$${month.toFixed(2)} a month, about $${(month * 12 / 52).toFixed(0)} a week`, real: true };
         })
         .sort((a, b) => b.save - a.save);
-      you.swaps = keep.filter(x => x.id === "rideapp-rides").concat(L.swapOptions, keep.filter(x => x.id === "dashpass-student"), subs);
+      // The bank sends no ride times, so the subway swap guesses daytime rides. If he told the app his
+      // real count (Swaps > All swaps > subway row), use it instead of the guess.
+      let daytime = null;
+      try { const v = localStorage.getItem("swapDaytimeRides"); daytime = v == null ? null : +v; } catch (e) {}
+      const opts = L.swapOptions.map(o => o.id !== "subway-day" || daytime == null || !(daytime >= 0) ? o : Object.assign({}, o, {
+        perWeek: daytime, timesPerWeek: daytime >= 2 ? Math.floor(daytime / 2) : daytime >= 1 ? 0.5 : 0,
+        everyOtherWeek: daytime >= 1 && daytime < 2, estimate: false, yours: true,
+        basis: String(o.basis || "").split(". ")[0] + `. You said about ${daytime} daytime rides a week.` }));
+      you.swaps = keep.filter(x => x.id === "rideapp-rides").concat(opts, keep.filter(x => x.id === "dashpass-student"), subs);
       // Keep the reasoning for the daytime subway swap (ride counts by app).
       const sub = you.swaps.find(x => x.id === "subway-day"), all = you.ridePrices.reduce((t, r) => t + (r.count || 0), 0);
       const emp = (you.ridePrices.find(r => RIDE_RE.test(r.app)) || {}).count || 0;

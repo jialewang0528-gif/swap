@@ -293,6 +293,13 @@ class SyncBankTest(unittest.TestCase):
 
 
 
+class TimeTest(unittest.TestCase):
+    def test_plaid_times_with_short_fractions(self):
+        # Plaid sometimes sends one fractional digit ("36.2Z"), which Python 3.9 can't parse natively.
+        self.assertEqual(pull.parse_time("2026-11-03T22:51:36.2Z").second, 36)
+        self.assertEqual(pull.parse_time("2026-11-03T22:51:36Z").minute, 51)
+
+
 class RecurringTest(unittest.TestCase):
     """A subscription is a charge that repeats on about the same day each month (a price rise is fine);
     one-off top-ups from the same merchant are spending."""

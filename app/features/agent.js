@@ -408,9 +408,15 @@ Swap.feature({
     // A short list of this week's charges in one category.
     function listCard(title, list, cap = 6) {
       const shown = list.slice(-cap);
+      // Same mark and name cleanup as every other charge list (category.js), so the ride app gets the
+      // ride icon and "Mta" reads "MTA".
+      const C = window.SwapCategory;
+      const markOf = c => C && C.txMark ? C.txMark(api, { name: c.merchant, amount: c.amount, cat: c.cat, tone: c.night ? "night" : c.kind ? api.kindOf(c) : undefined })
+        : api.brandMark(show(c.merchant), c.night ? "night" : c.kind, 32);
+      const nameOf = c => C && C.txName ? C.txName(api, c.merchant) : show(c.merchant);
       const rows = shown.map(c => `<div class="row">
-          ${api.brandMark(show(c.merchant), c.night ? "night" : c.kind, 32)}
-          <span class="grow t-sub"><span class="ag-ell">${esc(show(c.merchant))}</span><span class="t-foot t-2">${DAYS[c.day]}${c.time ? " · " + fmtClock(c.time) : ""}${c.night ? " · Night" : ""}</span></span>
+          ${markOf(c)}
+          <span class="grow t-sub"><span class="ag-ell">${esc(nameOf(c))}</span><span class="t-foot t-2">${DAYS[c.day]}${c.time ? " · " + fmtClock(c.time) : ""}${c.night ? " · Night" : ""}</span></span>
           <span class="amt num">${money(c.amount)}</span></div>`).join("");
       const more = list.length - shown.length;
       return el(`<div class="card ag-card">
@@ -921,7 +927,10 @@ Swap.feature({
     }
     const hist = [];   // last two exchanges (scripted or model), for follow-ups like "and the week before?"
     const CARD_INTENTS = new Set(["week", "why", "member", "swipes", "class", "save", "tonight", "cap", "plan", "track", "biggest", "charges", "today"]);
-    const MODEL_INTENTS = new Set([...CARD_INTENTS, "unknown"]);
+    // Exact-number questions (today, budget, on track, daily plan) always get the app's own math:
+    // the small on-device model mixed up "plan" and "left" in testing. It answers the open questions.
+    const EXACT = new Set(["today", "cap", "track", "plan"]);
+    const MODEL_INTENTS = new Set([...CARD_INTENTS, "unknown"].filter(id => !EXACT.has(id)));
     const NOT_CARD = /subscri|recurring|hulu|apple|anthropic|netflix|spotify|streaming|\bmonth/i;
     const GATED = new Set(["week", "why", "tonight", "charges", "track"]);
     function cardFits(it, q) {
