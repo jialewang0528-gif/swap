@@ -4,7 +4,7 @@ A weekly coach that helps college students spend less on food and getting around
 
 This is a product case study by Michael Wang (NYU, Economics). It started as a delivery tracker and changed twice once I looked at real data.
 
-**[Clickable prototype](prototype/index.html)** · [Product record](PRODUCT.md) · [Code](#how-the-code-works)
+**[Clickable prototype](https://michaelwang.lol/swap/prototype/)** · [Product record](PRODUCT.md) · [Code](#how-the-code-works)
 
 ---
 
