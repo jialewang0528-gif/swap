@@ -54,6 +54,8 @@
         const checked = bank ? `Bank checked ${bank}` : "Bank check time unknown";
         if (!window.SwapCloud || !st) return checked;
         if (st.state === "checking") return "Checking for new charges";
+        if (st.state === "asking") return "Asking your bank for new charges";
+        if (st.state === "slow") return `Your bank hasn't answered yet. ${checked}`;
         if (st.state === "waiting") return "New charges. Close to update";
         if (st.state === "fresh") return "Updating";
         if (st.state === "same") return `No new charges. ${checked}`;
@@ -137,7 +139,7 @@
         <h2 class="section-title">Today <small>${esc(T.dow)}, ${esc(T.short)}</small></h2>
         <div class="card td">
           <div class="td-sync t-foot"><span class="td-dot" aria-hidden="true"></span><span class="td-sync-t" role="status">${esc(syncText(window.SwapCloud && window.SwapCloud.status()))}</span>
-            ${window.SwapCloud ? `<button class="btn plain small td-check">Reload</button>` : ""}</div>
+            ${window.SwapCloud ? `<button class="btn plain small td-check">Check bank</button>` : ""}</div>
           ${fresh.length ? `<div class="td-new"><b class="t-foot">New since last check</b>${fresh.slice(0, 4).map(i => `<div class="td-new-row t-sub"><span>${esc(name(i.name))}</span><span class="num${i.amount < 0 ? " td-in" : ""}">${amt(i)}</span></div>`).join("")}${fresh.length > 4 ? `<span class="t-foot t-3">and ${fresh.length - 4} more</span>` : ""}</div>` : ""}
           <div class="td-top">
             <div class="td-today"><span class="t-foot t-3">${stale ? "Today's plan" : over ? "Over today" : "Left today"}</span>
@@ -243,7 +245,7 @@
       addEventListener("swap:cloud", onCloud);
       if (window.SwapCloud) syncEl.dataset.state = window.SwapCloud.status().state;
       const check = slot.querySelector(".td-check");
-      check && check.addEventListener("click", () => { haptic(); window.SwapCloud.refresh(); });
+      check && check.addEventListener("click", () => { haptic(); (window.SwapCloud.refreshBank || window.SwapCloud.refresh)(); });
       if (fresh.length) api.toast(`New: ${name(fresh[0].name)} ${amt(fresh[0])}${fresh.length > 1 ? `, ${fresh.length - 1} more` : ""}`, "check");
 
       // The iPhone app: these bank items are on screen now (no notification for them), and the save target.

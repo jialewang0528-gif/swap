@@ -15,7 +15,7 @@ I built it for myself first (Michael Wang, NYU Economics) and it runs on my iPho
 - **By day.** Every transaction, money in and out.
 - **Swaps.** Cheaper options built from your own charges (subway instead of a daytime ride, pickup instead of delivery, one fewer bodega run, cancel a subscription). Pick as many as you want each week and see how close they get you to your savings goal.
 - **Chat.** Ask "how much can I spend today" or "what do I spend the most on". On an iPhone with Apple Intelligence it answers on-device. Nothing leaves the phone.
-- **Updates itself and tells you.** Optional: a free private cloud link pulls fresh data from your bank every time you open the app, shows when your bank was last checked, and sends a notification when new charges land (iOS checks in the background a few times a day).
+- **Updates itself and tells you.** Optional: a free private cloud link pulls fresh data from your bank every time you open the app. **Check bank** asks Plaid to check your bank right now (Plaid's on-demand refresh, included on its free Trial plan, billed per call on paid plans), and the app does it on its own when your bank hasn't been checked in 4+ hours. New charges come with a notification.
 
 Night rides count as spending but are never a swap target. Getting home safe isn't something to cut.
 

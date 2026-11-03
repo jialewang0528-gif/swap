@@ -105,9 +105,10 @@
 .td-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-4); flex: none; }
 .td-sync[data-state="same"] .td-dot, .td-sync[data-state="fresh"] .td-dot { background: var(--accent); }
 .td-sync[data-state="error"] .td-dot { background: var(--food); }
-.td-sync[data-state="checking"] .td-dot { background: var(--move); }
+.td-sync[data-state="checking"] .td-dot, .td-sync[data-state="asking"] .td-dot { background: var(--move); }
+.td-sync[data-state="slow"] .td-dot { background: var(--ink-4); }
 @media (prefers-reduced-motion: no-preference) {
-  .td-sync[data-state="checking"] .td-dot { animation: td-pulse 1s ease-in-out infinite alternate; }
+  .td-sync[data-state="checking"] .td-dot, .td-sync[data-state="asking"] .td-dot { animation: td-pulse 1s ease-in-out infinite alternate; }
 }
 @keyframes td-pulse { from { opacity: .35; } to { opacity: 1; } }
 .td-check { margin-right: calc(-1 * var(--s-2)); }

@@ -77,8 +77,45 @@
       else { tell("same"); try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) {} }
     } catch (e) { tell("error"); }
   }
-  window.SwapCloud = { refresh: () => { last = 0; return refresh(); }, status: () => status };
-  addEventListener("load", () => setTimeout(refresh, 400));
+  // Ask Plaid to check the bank now (POST to the cloud link), then poll for up to 3 minutes until
+  // Plaid's "bank checked" time moves. At most once every 10 minutes from the button, once an hour
+  // on its own (when the bank hasn't been checked for 4+ hours).
+  const ASK = "swapBankAsk";
+  const askedAt = () => { try { return +localStorage.getItem(ASK) || 0; } catch (e) { return 0; } };
+  const checkedMs = d => d && d.bankCheckedAt ? new Date(d.bankCheckedAt).getTime() : 0;
+  let asking = false;
+  async function refreshBank(auto) {
+    if (asking) return;
+    if (Date.now() - askedAt() < (auto ? 60 : 10) * 60e3) { last = 0; return refresh(); }
+    asking = true;
+    const before = checkedMs(shown());
+    try { localStorage.setItem(ASK, String(Date.now())); } catch (e) {}
+    tell("asking");
+    try {
+      const r = await fetch(URL, { method: "POST", headers: { Authorization: "Bearer " + TOKEN }, cache: "no-store" });
+      if (!r.ok) { asking = false; tell("error"); return; }
+      for (let i = 0; i < 12; i++) {
+        await new Promise(res => setTimeout(res, 15000));
+        const g = await fetch(URL, { headers: { Authorization: "Bearer " + TOKEN }, cache: "no-store" });
+        if (!g.ok) continue;
+        const d = await g.json();
+        if (!d || !d.generatedAt || !complete(d)) continue;
+        if (checkedMs(d) > before) {
+          asking = false; last = Date.now();
+          if (print(d) !== print(shown())) show(d);
+          else { tell("same", { bankCheckedAt: d.bankCheckedAt || null }); try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) {} }
+          return;
+        }
+        tell("asking");
+      }
+      asking = false; tell("slow");
+    } catch (e) { asking = false; tell("error"); }
+  }
+  window.SwapCloud = { refresh: () => { last = 0; return refresh(); }, refreshBank: () => refreshBank(false), status: () => status };
+  addEventListener("load", () => setTimeout(() => {
+    const old = Date.now() - checkedMs(shown()) > 4 * 3600e3;
+    old ? refreshBank(true) : refresh();
+  }, 400));
   // The last sheet closed (core) or the chat field lost focus: apply data that was waiting.
   addEventListener("swap:sheets-closed", () => setTimeout(flush, 300));
   document.addEventListener("focusout", () => setTimeout(flush, 300));

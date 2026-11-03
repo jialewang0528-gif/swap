@@ -264,7 +264,7 @@ def bank_label(t, section, kind):
         # App Store bills bundle many subscriptions, so they always count. Anything else is a
         # subscription only when the same amount repeats on about the same day each month; a
         # one-off top-up (API tokens, an upgrade) is spending until it repeats.
-        if re.search(r"apple\.com/bill", text, re.I) or is_recurring(t):
+        if re.search(r"apple\.com/bill|\bsub\b|subscription|membership", text, re.I) or is_recurring(t):
             return "Subscriptions"
         return "Services"
     if FUN_PATTERN.search(" ".join([t.get("name") or "", t.get("merchant_name") or ""])):
@@ -743,12 +743,39 @@ def build_live(token, logos=True):
     return live
 
 
+def ask_bank(token, wait=120):
+    """Ask Plaid to check the bank now (/transactions/refresh), then wait until its last check time
+    moves or `wait` seconds pass. Included on Plaid's Trial plan; billed per call on paid plans."""
+    import time
+    def checked():
+        st = (pull.plaid("/item/get", {"access_token": token}).get("status") or {}).get("transactions") or {}
+        return st.get("last_successful_update") or ""
+    before = checked()
+    try:
+        pull.plaid("/transactions/refresh", {"access_token": token})
+    except SystemExit as e:
+        print(f"refresh not available: {e}")
+        return
+    end = time.time() + wait
+    while time.time() < end:
+        time.sleep(15)
+        if checked() > before:
+            print("bank checked")
+            return
+    print("bank not checked yet; using what Plaid has")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--person", default="p00")
+    parser.add_argument("--refresh", action="store_true",
+                        help="ask Plaid to check the bank first, then wait for it (up to 2 minutes)")
     args = parser.parse_args()
     pull.load_env()
-    live = build_live(pull.saved_token(args.person))
+    token = pull.saved_token(args.person)
+    if args.refresh:
+        ask_bank(token)
+    live = build_live(token)
     charges, series = live["charges"], live["weekly"]
 
     os.makedirs(os.path.dirname(OUT), exist_ok=True)

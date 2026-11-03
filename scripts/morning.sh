@@ -14,7 +14,7 @@ exec >>"$LOG" 2>&1
 echo "=== $(date '+%Y-%m-%d %H:%M') ==="
 
 cd "$ROOT" || exit 1
-/usr/bin/python3 sync.py || { echo "sync failed"; exit 1; }
+/usr/bin/python3 sync.py --refresh || { echo "sync failed"; exit 1; }
 
 # If you set up the cloud link (cloud/.vercel exists), keep it on the same sync code and the same
 # .env options as this Mac. A deploy only counts once it succeeds (data/cloud-deployed.sha), so a
