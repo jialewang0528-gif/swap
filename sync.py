@@ -293,6 +293,8 @@ def whole_bank(txns, kinds, cancelled, last_week, this_monday, accounts, posted=
         wk = week_start(d)
         kind = kinds.get(sid)
         label = bank_label(t, section, kind)
+        if label == "Investing":          # e.g. a CATEGORY_OVERRIDES entry for a crypto on-ramp: not spending
+            section = "investing"
         name = bank_name(t, kind, posted)
         fixed = label in FIXED_CATS
         hold = is_ride_hold(t)
