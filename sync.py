@@ -195,6 +195,35 @@ def bank_name(t, kind, posted=None):
     return clean_name(raw, posted) if re.match(r"\s*POS ", raw, re.IGNORECASE) else tidy(raw)
 
 
+RECURRING = set()   # (merchant, amount) pairs that bill monthly; filled by find_recurring()
+
+
+def merchant_key(t):
+    return re.sub(r"[^a-z]", "", (t.get("merchant_name") or t.get("name") or "").lower())[:24]
+
+
+def find_recurring(txns):
+    """A charge is a subscription bill when the same merchant also charged in a different month on
+    about the same day of the month (4 days either way) at about the same price (within 20%, so a
+    price rise still counts). One-off top-ups, upgrades and same-day doubles don't match."""
+    by = defaultdict(list)
+    for t in txns.values():
+        if t["amount"] > 0:
+            by[merchant_key(t)].append((date.fromisoformat(t.get("authorized_date") or t["date"]), round(t["amount"], 2), t))
+    RECURRING.clear()
+    for key, rows in by.items():
+        for d, a, t in rows:
+            for d2, a2, _ in rows:
+                if (d2.year, d2.month) != (d.year, d.month) and abs(d2.day - d.day) <= 4 and abs(a2 - a) <= 0.2 * max(a, a2):
+                    RECURRING.add((key, a, d))
+                    break
+
+
+def is_recurring(t):
+    d = date.fromisoformat(t.get("authorized_date") or t["date"])
+    return (merchant_key(t), round(t["amount"], 2), d) in RECURRING
+
+
 def bank_label(t, section, kind):
     """One category per transaction for the whole-bank view."""
     c = (t.get("personal_finance_category") or {}).get("detailed") or ""
@@ -230,8 +259,14 @@ def bank_label(t, section, kind):
         return "Venmo & other transfers" if out else "Other money in"
     if not out:
         return "Refunds"
-    if SUBSCRIPTION_PATTERN.search(" ".join([t.get("name") or "", t.get("merchant_name") or ""])):
-        return "Subscriptions"
+    text = " ".join([t.get("name") or "", t.get("merchant_name") or ""])
+    if SUBSCRIPTION_PATTERN.search(text):
+        # App Store bills bundle many subscriptions, so they always count. Anything else is a
+        # subscription only when the same amount repeats on about the same day each month; a
+        # one-off top-up (API tokens, an upgrade) is spending until it repeats.
+        if re.search(r"apple\.com/bill", text, re.I) or is_recurring(t):
+            return "Subscriptions"
+        return "Services"
     if FUN_PATTERN.search(" ".join([t.get("name") or "", t.get("merchant_name") or ""])):
         return "Fun"
     for prefix, label in BANK_LABELS:
@@ -279,6 +314,7 @@ def whole_bank(txns, kinds, cancelled, last_week, this_monday, accounts, posted=
     history = []
     weekday = [0.0] * 7          # all money out by weekday (10 weeks)
     flex_weekday = [0.0] * 7     # flexible money out by weekday (10 weeks): the daily plan's shape
+    find_recurring(txns)
     for t in txns.values():
         sid = stable_id(t)
         if not t["amount"] or sid in cancelled:

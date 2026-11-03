@@ -292,5 +292,30 @@ class SyncBankTest(unittest.TestCase):
         self.assertFalse(any(h["name"].upper().startswith("POS ") for h in b["history"]))
 
 
+
+class RecurringTest(unittest.TestCase):
+    """A subscription is a charge that repeats on about the same day each month (a price rise is fine);
+    one-off top-ups from the same merchant are spending."""
+
+    def setUp(self):
+        import sync
+        self.sync = sync
+
+    def tx(self, i, d, amount, name="STREAMCO"):
+        return {"transaction_id": str(i), "date": d, "authorized_date": d, "amount": amount, "name": name, "merchant_name": name}
+
+    def test_price_rise_still_recurring_but_top_ups_are_not(self):
+        txns = {t["transaction_id"]: t for t in [
+            self.tx(1, "2026-08-27", 17.15), self.tx(2, "2026-09-27", 17.15), self.tx(3, "2026-10-27", 19.15),
+            self.tx(4, "2026-09-09", 108.88, "AIPLAN"), self.tx(5, "2026-10-09", 108.88, "AIPLAN"),
+            self.tx(6, "2026-09-18", 97.99, "AIPLAN"), self.tx(7, "2026-10-26", 97.99, "AIPLAN"), self.tx(8, "2026-10-26", 97.99, "AIPLAN"),
+        ]}
+        self.sync.find_recurring(txns)
+        rec = {k: self.sync.is_recurring(t) for k, t in txns.items()}
+        self.assertTrue(rec["1"] and rec["2"] and rec["3"])
+        self.assertTrue(rec["4"] and rec["5"])
+        self.assertFalse(rec["6"] or rec["7"] or rec["8"])
+
+
 if __name__ == "__main__":
     unittest.main()

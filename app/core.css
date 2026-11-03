@@ -415,3 +415,12 @@ h1, h2, h3, p { overflow-wrap: break-word; }
 @media (hover: hover) { .tap-row:hover { background: var(--fill); } }
 .tap-row:active { background: var(--fill); }
 .tap-row:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* Category picker (category.js recategorize). */
+.cg-pick { display: grid; padding: var(--s-1) var(--s-3); margin-top: var(--s-3); }
+.cg-opt { all: unset; box-sizing: border-box; display: grid; gap: 2px; min-height: var(--tap); padding: var(--s-2) var(--s-1); cursor: pointer; border-radius: var(--r-well); }
+.cg-opt + .cg-opt { box-shadow: 0 -.5px 0 var(--hair); }
+.cg-opt[aria-checked="true"] { background: var(--fill); }
+.cg-opt[aria-checked="true"] .t-sub { font-weight: 700; }
+.cg-opt:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.cg-hint { margin: var(--s-4) var(--s-1) 0; }

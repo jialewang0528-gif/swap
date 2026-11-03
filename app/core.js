@@ -411,7 +411,7 @@
     const add = (a, b) => a + b;
     const B = budget(save), s = B.save, usual = B.usual, cap = B.budget;
     const raw = !sameWeek ? [] : all
-      ? bp.B.items.filter(i => i.week === "now").map(i => Object.assign({ merchant: i.name }, i, { fixed: bp.isFixed(i) }))
+      ? bp.B.items.filter(i => i.week === "now" && i.cat !== "Investing").map(i => Object.assign({ merchant: i.name }, i, { fixed: bp.isFixed(i) }))
       : (C.charges || []);
     const charges = raw.filter(c => !c.fixed), fixed = raw.filter(c => c.fixed);
     // Last day the bank was checked, as a day of this week (-1 = before Monday).

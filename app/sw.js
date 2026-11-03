@@ -1,7 +1,7 @@
 // Offline cache for the installed app. Bump VERSION on every deploy.
 importScripts("features.js");
-const VERSION = "swap-v25";
-const FILES = ["./", "index.html", "core.css", "core.js", "data.js", "features.js", "ai.js", "cloud.js", "category.js", "swapmath.js", "manifest.webmanifest",
+const VERSION = "swap-v26";
+const FILES = ["./", "index.html", "core.css", "core.js", "data.js", "features.js", "ai.js", "cloud.js", "overrides.js", "category.js", "swapmath.js", "manifest.webmanifest",
   "icons/icon.svg", "icons/icon-180.png", "vendor/qrcode.min.js",
   ...self.SWAP_FEATURES.flatMap(id => [`features/${id}.js`, `features/${id}.css`])];
 
