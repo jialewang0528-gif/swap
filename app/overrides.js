@@ -3,8 +3,8 @@
    plan, a bodega). Every answer here is saved per merchant and applied to window.SwapLive.bank
    before the app reads it, and every total is worked out again from the charge history:
    Where your money goes, Whole bank, the usual week and the daily plan's budget.
-     SwapOverrides.set("Coin Exchange", "Investing")   // not spending
-     SwapOverrides.set("Photo App Pro", "Subscriptions")    // a bill: outside the daily plan
+     SwapOverrides.set("Coin Exchange", "Services", "Investing")      // not spending
+     SwapOverrides.set("Photo App Pro", "Services", "Subscriptions")  // a bill: outside the daily plan
    Runs after cloud.js (which may swap in newer cloud data) and before data.js. */
 (function () {
   const KEY = "swapCatOverrides", SKIP = "swapCatSkipped";
