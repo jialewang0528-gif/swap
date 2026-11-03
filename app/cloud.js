@@ -24,24 +24,37 @@
   const shown = () => window.SwapLive;
   let last = 0, waiting = null;
   const busy = () => !!document.querySelector(".sheet") || (document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName));
+  // Status for the screen: "checking" | "fresh" (new data, reloading) | "same" | "error", with times.
+  const status = { state: "idle", at: null, bankCheckedAt: (shown() || {}).bankCheckedAt || null };
+  const tell = (state, extra) => {
+    Object.assign(status, { state, at: new Date().toISOString() }, extra || {});
+    try { dispatchEvent(new CustomEvent("swap:cloud", { detail: status })); } catch (e) {}
+  };
+  // Bank items that weren't on screen before: kept across the reload so the app can say what's new.
+  const newItems = d => {
+    const had = new Set((((shown() || {}).bank || {}).items || []).map(i => i.id));
+    return ((d.bank || {}).items || []).filter(i => !had.has(i.id)).map(i => ({ name: i.name, amount: i.amount, cat: i.cat }));
+  };
   function show(d) {
     if (busy()) { waiting = d; return; }
-    try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) {}
+    const fresh = newItems(d);
+    try { localStorage.setItem(KEY, JSON.stringify(d)); if (fresh.length) localStorage.setItem("swapNew", JSON.stringify(fresh)); } catch (e) {}
     location.reload();
   }
   async function refresh() {
     if (Date.now() - last < 5 * 60e3) return;
     last = Date.now();
+    tell("checking");
     try {
       const r = await fetch(URL, { headers: { Authorization: "Bearer " + TOKEN }, cache: "no-store" });
-      if (!r.ok) return;
+      if (!r.ok) { tell("error"); return; }
       const d = await r.json();
-      if (!d || !d.generatedAt || !complete(d)) return;
-      if (print(d) !== print(shown())) show(d);
-      else { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) {} }
-    } catch (e) {}
+      if (!d || !d.generatedAt || !complete(d)) { tell("error"); return; }
+      if (print(d) !== print(shown())) { tell("fresh", { bankCheckedAt: d.bankCheckedAt || null }); show(d); }
+      else { tell("same", { bankCheckedAt: d.bankCheckedAt || null }); try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) {} }
+    } catch (e) { tell("error"); }
   }
-  window.SwapCloud = { refresh: () => { last = 0; return refresh(); } };
+  window.SwapCloud = { refresh: () => { last = 0; return refresh(); }, status: () => status };
   addEventListener("load", () => setTimeout(refresh, 400));
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "visible") return;

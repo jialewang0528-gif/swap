@@ -11,7 +11,7 @@
     title: "Daily plan",
     pitch: "What you can spend today to hit the week.",
     tab: "week",
-    order: 0.5,
+    order: 0.2,
 
     render(slot, api) {
       if (typeof api.dailyPlan !== "function") return;
@@ -34,6 +34,26 @@
       const fill = d => d.plan > 0 ? Math.min(100, Math.round(d.spent / d.plan * 100)) : d.spent > 0 ? 100 : 0;
       const label = d => `${d.dow} ${d.short}: plan ${money(d.plan)}${d.past || d.isToday ? `, spent ${money(d.spent)}` : ""}`;
       let sel = P.today;
+      // Refresh status: when Plaid last checked the bank, and what the app is doing right now.
+      const when = iso => {
+        if (!iso) return null;
+        const d = new Date(iso), now = new Date(), y = new Date(now); y.setDate(now.getDate() - 1);
+        const t = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+        return d.toDateString() === now.toDateString() ? `today ${t}` : d.toDateString() === y.toDateString() ? `yesterday ${t}` : `${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })} ${t}`;
+      };
+      const syncText = st => {
+        const bank = when((st && st.bankCheckedAt) || (window.SwapLive || {}).bankCheckedAt);
+        const checked = bank ? `Bank checked ${bank}` : "Bank check time unknown";
+        if (!window.SwapCloud) return checked;
+        if (st && st.state === "checking") return "Checking for new charges";
+        if (st && st.state === "same") return `Up to date. ${checked}`;
+        if (st && st.state === "error") return `Can't reach your bank link. ${checked}`;
+        return checked;
+      };
+      // Charges that arrived since the last time the app showed data (saved by cloud.js on reload).
+      let fresh = [];
+      try { fresh = JSON.parse(localStorage.getItem("swapNew") || "[]"); localStorage.removeItem("swapNew"); } catch (e) {}
+      const amt = i => i.amount < 0 ? `+${money(-i.amount, 2)}` : money(i.amount, 2);
 
       // What was spent on one day: every charge, money in with a +.
       function dayList() {
@@ -51,6 +71,9 @@
       slot.innerHTML = `
         <h2 class="section-title">Today <small>${esc(T.dow)}, ${esc(T.short)}</small></h2>
         <div class="card td">
+          <div class="td-sync t-foot"><span class="td-dot" aria-hidden="true"></span><span class="td-sync-t" role="status">${esc(syncText(window.SwapCloud && window.SwapCloud.status()))}</span>
+            ${window.SwapCloud ? `<button class="btn plain small td-check">Check now</button>` : ""}</div>
+          ${fresh.length ? `<div class="td-new"><b class="t-foot">New since last check</b>${fresh.slice(0, 4).map(i => `<div class="td-new-row t-sub"><span>${esc(name(i.name))}</span><span class="num${i.amount < 0 ? " td-in" : ""}">${amt(i)}</span></div>`).join("")}${fresh.length > 4 ? `<span class="t-foot t-3">and ${fresh.length - 4} more</span>` : ""}</div>` : ""}
           <div class="td-top">
             <div><span class="t-foot t-3">${over ? "Over today" : "Left today"}</span>
               <b class="num td-big ${over ? "over" : ""}">${money(Math.abs(P.todayLeft))}</b>
@@ -96,7 +119,7 @@
         const inn = P.charges.filter(c => c.amount < 0).reduce((t, c) => t - c.amount, 0);
         const swaps = (api.swaps() || []).filter(x => !x.sub && (x.perWeek || 0) >= 0.5).sort((a, b) => b.save - a.save).slice(0, 3);
         const UNIT = { ride: "a ride", order: "an order", run: "a run", night: "a night", meal: "a meal", week: "a week", month: "a month" };
-        const tone = c => /Eating out|Alcohol|Coffee|Delivery/.test(c) ? "food" : /Rides|Subway/.test(c) ? "move" : "other";
+        const tone = c => /Eating out|Clubs|Bodega|Alcohol|Coffee|Delivery/.test(c) ? "food" : /Rides|Subway/.test(c) ? "move" : "other";
         const dayCharges = i => P.charges.filter(c => dayOfCharge(c) === i);
 
         api.sheet(body => {
@@ -143,6 +166,14 @@
         }, { label: "This week in depth" });
       }
 
+      const syncEl = slot.querySelector(".td-sync"), syncT = slot.querySelector(".td-sync-t");
+      const onCloud = e => { if (!syncEl.isConnected) return; syncEl.dataset.state = e.detail.state; syncT.textContent = syncText(e.detail); };
+      addEventListener("swap:cloud", onCloud);
+      if (window.SwapCloud) syncEl.dataset.state = window.SwapCloud.status().state;
+      const check = slot.querySelector(".td-check");
+      check && check.addEventListener("click", () => { haptic(); window.SwapCloud.refresh(); });
+      if (fresh.length) api.toast(`New: ${name(fresh[0].name)} ${amt(fresh[0])}${fresh.length > 1 ? `, ${fresh.length - 1} more` : ""}`, "check");
+
       const listEl = slot.querySelector(".td-list");
       slot.querySelectorAll(".td-day").forEach(b => b.addEventListener("click", () => {
         const i = +b.dataset.i;
@@ -151,6 +182,7 @@
         slot.querySelectorAll(".td-day").forEach(x => x.setAttribute("aria-pressed", String(+x.dataset.i === sel)));
         listEl.innerHTML = dayList();
       }));
+      return () => removeEventListener("swap:cloud", onCloud);
     }
   });
 })();

@@ -22,7 +22,7 @@
     nights: { "0": "No late nights", "1-2": "1–2 late nights", "3+": "3+ late nights" }
   };
   const UNIT = { week: "a week", order: "an order", meal: "a meal", ride: "a ride", month: "a month" };
-  const KIND_NAME = { ride: "Rides", delivery: "Delivery", dining: "Eating out", drinks: "Alcohol & bodega", quick: "Coffee & snacks", transit: "Subway" };
+  const KIND_NAME = { ride: "Rides", delivery: "Delivery", dining: "Eating out", drinks: "Clubs, bars & bodega", quick: "Coffee & snacks", transit: "Subway" };
   const complete = p => !!p && Q.every(q => p[q.key] != null);
   const plain = s => String(s).replace(/\s*→\s*/g, " to ");
   // Pickup swap whose place isn't in the student's own price gaps: show the gaps it really has.

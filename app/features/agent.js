@@ -38,7 +38,7 @@ Swap.feature({
     const M = (n, d = 0) => `<b class="num">${money(n, d)}</b>`;
     const pct = (a, b) => (b > 0 ? Math.max(0, Math.min(100, 100 * a / b)) : 0).toFixed(2) + "%";
     const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-    const CAT = { dining: "Eating out", drinks: "Alcohol & bodega", delivery: "Delivery", quick: "Coffee & snacks", ride: "Rides", transit: "Subway" };
+    const CAT = { dining: "Eating out", drinks: "Clubs, bars & bodega", delivery: "Delivery", quick: "Coffee & snacks", ride: "Rides", transit: "Subway" };
     const FOODK = ["dining", "drinks", "delivery", "quick"], MOVEK = ["ride", "transit"];
     const UNIT = { week: "a week", order: "an order", meal: "a meal", ride: "a ride", month: "a month" };
     const unitOf = s => UNIT[s.unit] || "each time";
@@ -247,9 +247,9 @@ Swap.feature({
     const dLabel = d => `${d.dow} ${d.short}`;
     const recapLabel = () => (weekPast() || plan()) ? "Last week" : WN;
     // Bank categories that map onto the food / getting-around kinds.
-    const KIND_OF_CAT = { "Eating out": "dining", "Alcohol & bodega": "drinks", "Coffee & snacks": "quick", "Delivery": "delivery", "Rides": "ride", "Subway": "transit" };
+    const KIND_OF_CAT = { "Eating out": "dining", "Clubs & bars": "drinks", "Bodega & liquor": "drinks", "Alcohol & bodega": "drinks", "Coffee & snacks": "quick", "Delivery": "delivery", "Rides": "ride", "Subway": "transit" };
     // What counts as cuttable for "most unnecessary". Rides, money to friends, bills and health are not.
-    const CUTTABLE = /eating out|shopping|alcohol|bodega|subscription|coffee|snack|delivery|\bfun\b|entertainment|prediction|gambl/i;
+    const CUTTABLE = /eating out|shopping|alcohol|bodega|club|\bbars?\b|liquor|subscription|coffee|snack|delivery|\bfun\b|entertainment|prediction|gambl/i;
     // A charge from dailyPlan(): food/ride charges ({kind, merchant}) or, with whole-bank data, bank
     // items ({cat, name}). Both become { kind (null when not food/ride), cat, merchant, night, day }.
     function normCharge(c) {
@@ -551,7 +551,7 @@ Swap.feature({
     function focusOf(t) {
       if (/\bdeliver(y|ies|ed)?\b|doordash|grubhub|seamless/.test(t)) return "delivery";
       if (/\bcoffee|snacks?|boba\b/.test(t)) return "quick";
-      if (/alcohol|\bbooze|liquor|\bbeer|\bwine|bodega|\bdeli\b|\bbars?\b|\bdrinking\b/.test(t)) return "drinks";
+      if (/alcohol|\bbooze|liquor|\bbeer|\bwine|bodega|\bdeli\b|\bbars?\b|\bclubs?\b|clubbing|going out|\bdrinking\b/.test(t)) return "drinks";
       if (/eat(ing)? out|restaurants?|dining out/.test(t)) return "dining";
       if (RIDE.test(t)) return "ride";
       if (/\bsubway|metro|\bmta\b|\btrains?\b/.test(t)) return "transit";
@@ -660,8 +660,8 @@ Swap.feature({
       const shown = c => (rideAppOK() || !isRideApp(c.merchant)) ? show(c.merchant) : "Ride app";
       L.push(allReal ? "Source: your real bank data." : "Source: a sample student, not real card data.");
       const all = !!(p && p.scope === "all"), fcap = typeof api.capOf === "function" ? api.capOf() : T.cap;
-      if (all) L.push(`Budget this week covers ALL spending out of the bank (except investing). The food + getting around cap (${$(fcap)}) covers only Eating out, Alcohol & bodega, Coffee & snacks, Delivery, Rides, Subway; use it only for food or ride questions, and for last week.`);
-      else L.push("The cap covers food and getting around only: Eating out, Alcohol & bodega, Coffee & snacks, Delivery, Rides, Subway. Food = the first four. Getting around = Rides + Subway.");
+      if (all) L.push(`Budget this week covers ALL spending out of the bank (except investing). The food + getting around cap (${$(fcap)}) covers only Eating out, Clubs, bars & bodega, Coffee & snacks, Delivery, Rides, Subway; use it only for food or ride questions, and for last week.`);
+      else L.push("The cap covers food and getting around only: Eating out, Clubs, bars & bodega, Coffee & snacks, Delivery, Rides, Subway. Food = the first four. Getting around = Rides + Subway.");
       if (p) {
         const td = p.days[p.today], v = weekView("this"), C = v.charges, CW = all ? "Budget" : "Cap";
         L.push(`Today is ${td.dow} ${td.short}. "This week" = ${dLabel(p.days[0])} to ${dLabel(p.days[6])}. "Last week" = ${D.weekLabel ? D.weekLabel.replace(/\s*[–-]\s*/, " to ") : "the week before"}.`);

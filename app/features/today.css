@@ -70,3 +70,20 @@
 .tw-day .grow, .tw-swaps .grow { display: grid; }
 .tw-swaps { padding: var(--s-1) var(--s-4); }
 .tw-fine { margin: var(--s-4) var(--s-1) 0; }
+
+/* Refresh status and what's new. */
+.td-sync { display: flex; align-items: center; gap: var(--s-2); color: var(--ink-3); margin: calc(-1 * var(--s-1)) 0 0; }
+.td-sync-t { flex: 1; min-width: 0; }
+.td-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-4); flex: none; }
+.td-sync[data-state="same"] .td-dot, .td-sync[data-state="fresh"] .td-dot { background: var(--accent); }
+.td-sync[data-state="error"] .td-dot { background: var(--food); }
+.td-sync[data-state="checking"] .td-dot { background: var(--move); }
+@media (prefers-reduced-motion: no-preference) {
+  .td-sync[data-state="checking"] .td-dot { animation: td-pulse 1s ease-in-out infinite alternate; }
+}
+@keyframes td-pulse { from { opacity: .35; } to { opacity: 1; } }
+.td-check { margin-right: calc(-1 * var(--s-2)); }
+.td-new { display: grid; gap: 4px; padding: var(--s-3); border-radius: var(--r-tile); background: var(--accent-soft); }
+.td-new b { color: var(--accent-ink); }
+.td-new-row { display: flex; justify-content: space-between; gap: var(--s-3); }
+.td-new-row span:first-child { min-width: 0; overflow-wrap: anywhere; }

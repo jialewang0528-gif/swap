@@ -62,6 +62,17 @@ RIDE_PATTERN = re.compile(r"\buber\b|\blyft\b|\bcurb\b", re.IGNORECASE)
 CHEAP_RIDE_APP_PATTERN = re.compile(r"driverideapp|rideapp\*\s*holdfordriver", re.IGNORECASE)
 # Alcohol: bars and liquor stores, plus delis, bodegas and convenience stores (where the beer is).
 # Card networks file a pending liquor-store charge as general merchandise, so names count too.
+# Clubs and lounges: nights out, even when the card network files them as a restaurant. Add your
+# own spots in .env as CLUB_MERCHANTS=place one,place two (kept out of git).
+CLUB_PATTERN = re.compile(r"night\s*club|\blounge\b|\bhookah\b", re.IGNORECASE)
+
+
+def is_club(text):
+    own = [c.strip().lower() for c in os.environ.get("CLUB_MERCHANTS", "").split(",") if c.strip()]
+    low = text.lower()
+    return bool(CLUB_PATTERN.search(text)) or any(c in low for c in own)
+
+
 DRINKS_PATTERN = re.compile(r"\bwine\b|liquor|spirits|\bbeer\b|bodega|\bdeli\b|mini\s*mar(ke)?t|go\s*mart|7-?eleven", re.IGNORECASE)
 # Monthly passes like DashPass are a fixed cost, not an order, so they're counted separately.
 MEMBERSHIP_PATTERN = re.compile(r"dashpass|uber\s*one|grubhub\s*\+|grubhub\s*plus|lyft\s*pink", re.IGNORECASE)
@@ -106,6 +117,8 @@ def classify(txn):
     # Old and new Plaid category lists both contain this phrase.
     if "TAXIS_AND_RIDE_SHARES" in category or RIDE_PATTERN.search(text):
         return "ride"
+    if is_club(text):
+        return "drinks"
     if DRINKS_PATTERN.search(text) and not category.startswith("FOOD_AND_DRINK_RESTAURANT"):
         return "drinks"
     if category in CATEGORY_KINDS:

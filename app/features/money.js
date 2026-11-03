@@ -3,7 +3,7 @@
    ranked by category with a weekly average, then the places that took the most, then a link to the
    swaps that act on it. Founder's build only (needs window.SwapLive.bank.analysis). */
 (function () {
-  const FOOD = new Set(["Eating out", "Alcohol & bodega", "Coffee & snacks", "Delivery"]);
+  const FOOD = new Set(["Eating out", "Clubs & bars", "Bodega & liquor", "Coffee & snacks", "Delivery"]);
   const MOVE = new Set(["Rides", "Subway"]);
   const tone = c => FOOD.has(c) ? "food" : MOVE.has(c) ? "move" : "other";
 
@@ -12,7 +12,7 @@
     title: "Where your money goes",
     pitch: "What you spend the most on, last 10 weeks.",
     tab: "week",
-    order: 0.3,
+    order: 0.4,
 
     render(slot, api) {
       const B = api.profile() === "you" && window.SwapLive && window.SwapLive.bank;

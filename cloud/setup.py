@@ -65,6 +65,7 @@ def main():
         "SWAP_APP_TOKEN": app_key, "HIDE_MERCHANTS": env.get("HIDE_MERCHANTS", ""),
         "SUPPORT_SENDERS": env.get("SUPPORT_SENDERS", ""),
         "RIDE_APP_NAME": env.get("RIDE_APP_NAME", ""), "RECOMMEND_RIDE_APP": env.get("RECOMMEND_RIDE_APP", ""),
+        "CLUB_MERCHANTS": env.get("CLUB_MERCHANTS", ""),
     }
     for name, value in values.items():
         if not value:

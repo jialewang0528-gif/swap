@@ -1,3 +1,4 @@
+import BackgroundTasks
 import SwiftUI
 import UIKit
 import UserNotifications
@@ -12,12 +13,88 @@ import FoundationModels
 // (Apple Intelligence, iOS 26+). Questions and spending data never leave the phone.
 @main
 struct SwapApp: App {
+    @Environment(\.scenePhase) private var phase
+    init() { BankWatch.register() }
     var body: some Scene {
         WindowGroup {
             SwapWebView()
                 .ignoresSafeArea()
                 .background(Color(red: 0.965, green: 0.957, blue: 0.984))
         }
+        .onChange(of: phase) { _, now in
+            // Open: what's on screen counts as seen. Leaving: ask iOS for a background check.
+            if now == .active { BankWatch.check(notify: false) }
+            if now == .background { BankWatch.schedule() }
+        }
+    }
+}
+
+// Background bank check (only if the private cloud link is set up: app/private/cloud-config.js).
+// Every so often, when iOS allows it, Swap wakes up, asks the cloud link for fresh data and posts
+// a notification for charges you haven't seen yet ("Corner Cafe $14.20"). No server push or
+// paid developer account needed; iOS decides how often (usually a few times a day).
+enum BankWatch {
+    static let taskID = "swap.bankcheck"
+    private static let seenKey = "swap.seenItems"
+
+    static func register() {
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: taskID, using: nil) { task in
+            schedule()
+            task.expirationHandler = { task.setTaskCompleted(success: false) }
+            check(notify: true) { ok in task.setTaskCompleted(success: ok) }
+        }
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+    }
+
+    static func schedule() {
+        let req = BGAppRefreshTaskRequest(identifier: taskID)
+        req.earliestBeginDate = Date(timeIntervalSinceNow: 30 * 60)
+        try? BGTaskScheduler.shared.submit(req)
+    }
+
+    // url + token from the bundled private config the web app also reads.
+    private static func config() -> (URL, String)? {
+        guard let f = Bundle.main.url(forResource: "cloud-config", withExtension: "js", subdirectory: "app/private"),
+              let text = try? String(contentsOf: f, encoding: .utf8) else { return nil }
+        func field(_ name: String) -> String? {
+            guard let r = text.range(of: name + #":\s*"([^"]+)""#, options: .regularExpression) else { return nil }
+            return text[r].split(separator: "\"").dropFirst().first.map(String.init)
+        }
+        guard let base = field("url"), let token = field("token"), let url = URL(string: base + "/api/live") else { return nil }
+        return (url, token)
+    }
+
+    static func check(notify: Bool, done: ((Bool) -> Void)? = nil) {
+        guard let (url, token) = config() else { done?(false); return }
+        var req = URLRequest(url: url, timeoutInterval: 25)
+        req.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
+        URLSession.shared.dataTask(with: req) { data, _, _ in
+            guard let data, let live = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let bank = live["bank"] as? [String: Any], let items = bank["items"] as? [[String: Any]] else { done?(false); return }
+            let ids = items.compactMap { $0["id"] as? String }
+            let defaults = UserDefaults.standard
+            let seen = Set(defaults.stringArray(forKey: seenKey) ?? [])
+            defaults.set(ids, forKey: seenKey)
+            // First run only records what exists; after that, anything unseen is new.
+            guard notify, !seen.isEmpty else { done?(true); return }
+            let fresh = items.filter { ($0["id"] as? String).map { !seen.contains($0) } ?? false }
+            if !fresh.isEmpty { post(fresh, rideApp: live["rideAppName"] as? String) }
+            done?(true)
+        }.resume()
+    }
+
+    private static func post(_ items: [[String: Any]], rideApp: String?) {
+        func line(_ i: [String: Any]) -> String {
+            var name = i["name"] as? String ?? "Charge"
+            if let r = rideApp, name == "Lower-fare app" { name = r }
+            let a = i["amount"] as? Double ?? 0
+            return String(format: a < 0 ? "%@ +$%.2f" : "%@ $%.2f", name, abs(a))
+        }
+        let content = UNMutableNotificationContent()
+        content.title = items.count == 1 ? "New on your bank" : "\(items.count) new on your bank"
+        content.body = items.prefix(3).map(line).joined(separator: "\n") + (items.count > 3 ? "\nand \(items.count - 3) more" : "")
+        content.sound = .default
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "swap.new.\(Date().timeIntervalSince1970)", content: content, trigger: nil))
     }
 }
 

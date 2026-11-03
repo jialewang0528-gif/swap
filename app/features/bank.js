@@ -6,7 +6,7 @@
 (function () {
   const DAY = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const DAY_LONG = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-  const FOOD = new Set(["Eating out", "Alcohol & bodega", "Coffee & snacks", "Delivery"]);
+  const FOOD = new Set(["Eating out", "Clubs & bars", "Bodega & liquor", "Coffee & snacks", "Delivery"]);
   const MOVE = new Set(["Rides", "Subway"]);
   const toneOf = cat => FOOD.has(cat) ? "food" : MOVE.has(cat) ? "move" : "other";
 

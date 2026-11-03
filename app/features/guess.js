@@ -374,7 +374,7 @@
               <div class="gw-paper">
                 <div class="head"><b>SWAP · WEEKLY</b><span>${esc(D.weekLabel)}${real ? "" : D.source === "real" ? " · sample week" : " · sample student"}</span></div>
                 ${line("Food", items.food, "group")}
-                ${opt("Eating out", items.dining)}${opt("Alcohol &amp; bodega", items.drinks)}${opt("Coffee &amp; snacks", items.quick)}${opt("Delivery", items.delivery)}
+                ${opt("Eating out", items.dining)}${opt("Clubs, bars &amp; bodega", items.drinks)}${opt("Coffee &amp; snacks", items.quick)}${opt("Delivery", items.delivery)}
                 ${line("Getting around", items.move, "group")}
                 ${items.rideCount ? line(`Rides (${items.rideCount})`, items.ride) : ""}
                 ${opt("Subway", items.transit)}

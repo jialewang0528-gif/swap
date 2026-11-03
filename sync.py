@@ -102,8 +102,17 @@ BANK_LABELS = [
     ("TRANSFER_OUT_WITHDRAWAL", "ATM cash"), ("LOAN_PAYMENTS", "Loan payments"), ("FOOD_AND_DRINK_GROCERIES", "Groceries"),
 ]
 SUBSCRIPTION_PATTERN = re.compile(r"apple\.com/bill|anthropic|claude\.ai|hulu|netflix|spotify|linkedin|crunchyroll|youtube|chatgpt|openai", re.IGNORECASE)
-SWAP_LABELS = {"dining": "Eating out", "drinks": "Alcohol & bodega", "quick": "Coffee & snacks",
+SWAP_LABELS = {"dining": "Eating out", "drinks": "Bodega & liquor", "quick": "Coffee & snacks",
                "delivery": "Delivery", "ride": "Rides", "transit": "Subway"}
+
+
+def is_night_out(t):
+    """A club or bar tab, not a bodega or liquor store run."""
+    text = " ".join([t.get("name") or "", t.get("merchant_name") or ""])
+    pfc = (t.get("personal_finance_category") or {}).get("detailed") or ""
+    if pull.is_club(text):
+        return True
+    return "BEER_WINE_AND_LIQUOR" in pfc and not re.search(r"wine|liquor|spirits|bodega|deli|mart", text, re.I)
 
 
 def bank_name(t, kind):
@@ -126,6 +135,8 @@ def bank_label(t, section, kind):
     """One category per transaction for the whole-bank view."""
     c = (t.get("personal_finance_category") or {}).get("detailed") or ""
     out = t["amount"] > 0
+    if kind == "drinks" and is_night_out(t):
+        return "Clubs & bars"
     if kind:
         return "Travel" if kind == "ride" and t["amount"] > TRAVEL_RIDE else SWAP_LABELS[kind]
     if section == "friends":
@@ -282,14 +293,14 @@ def swap_options(rows, txns, last_week, this_monday, gaps, ride_name):
         a, b = statistics.median(dine), statistics.median(fast)
         add("counter-meal", "Counter meal instead of sit-down", "Same night out, cheaper spot.", a - b, "meal", "food",
             "Eating out", len(dine) / n, f"Your sit-down median ${a:.0f} vs counter ${b:.0f}. {len(dine) / n:.1f} sit-downs a week")
-    bar = of(lambda r: r["kind"] == "drinks" and "BEER_WINE_AND_LIQUOR" in pfc(r) and not re.search(r"wine|liquor", raw(r), re.I))
+    bar = of(lambda r: r["kind"] == "drinks" and is_night_out(r["raw"]))
     if bar:
-        add("bar-night", "One fewer bar night", "Keep the rest of the week as is.", statistics.mean(bar), "night", "food",
-            "Alcohol & bodega", len(bar) / n, f"Your bar tab averages ${statistics.mean(bar):.0f}. {len(bar) / n:.1f} a week")
-    bodega = of(lambda r: r["kind"] == "drinks" and "BEER_WINE_AND_LIQUOR" not in pfc(r))
+        add("bar-night", "One fewer club or bar night", "Keep the rest of the week as is.", statistics.mean(bar), "night", "food",
+            "Clubs & bars", len(bar) / n, f"Your club and bar tabs average ${statistics.mean(bar):.0f}. {len(bar) / n:.1f} a week")
+    bodega = of(lambda r: r["kind"] == "drinks" and not is_night_out(r["raw"]))
     if bodega:
         m = statistics.median(bodega)
-        add("bodega", "One fewer bodega run", "Buy for two nights at once.", m, "run", "food", "Alcohol & bodega",
+        add("bodega", "One fewer bodega run", "Buy for two nights at once.", m, "run", "food", "Bodega & liquor",
             len(bodega) / n, f"Your bodega median ${m:.0f}. {len(bodega) / n:.1f} runs a week")
     snack = of(lambda r: r["kind"] == "quick" and "FAST_FOOD" not in pfc(r))
     if snack:
@@ -481,6 +492,13 @@ def build_live(token, logos=True):
     kinds = {r["id"]: r["kind"] for r in rows}
     accounts = pull.plaid("/accounts/get", {"access_token": token})["accounts"]
     live["bank"] = whole_bank(txns, kinds, cancelled, last_week, this_monday, accounts)
+    # When Plaid last checked the bank (it does this 1-4 times a day on its own), in NYC time.
+    try:
+        st = (pull.plaid("/item/get", {"access_token": token}).get("status") or {}).get("transactions") or {}
+        when = st.get("last_successful_update")
+        live["bankCheckedAt"] = datetime.fromisoformat(when.replace("Z", "+00:00")).astimezone(pull.NYC).replace(tzinfo=None).isoformat(timespec="minutes") if when else None
+    except SystemExit:
+        live["bankCheckedAt"] = None
     return live
 
 
