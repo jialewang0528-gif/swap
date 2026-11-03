@@ -1,0 +1,129 @@
+/* Guess your week: Week hero (cap, usual, status), dial, digit-roll reveal, printed receipt, story share.
+   Tokens only. The receipt paper is a solid surface with a monospace face, the one place that uses one. */
+
+/* ---------- Week hero ---------- */
+.gw-hero { display: grid; gap: var(--s-3); }
+.gw-hero-top { display: flex; justify-content: space-between; align-items: center; gap: var(--s-2); }
+.gw-hero-top h2 { margin: 0; color: var(--ink-2); }
+.gw-total { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-1); }
+.gw-mask { color: var(--ink-4); }
+.gw-status { margin: 0; }
+.gw-vs { margin: calc(-1 * var(--s-2)) 0 0; }
+.gw-note { margin: 0; }
+.gw-formula { display: block; margin-top: 2px; color: var(--ink-2); }
+.gw-cta { margin-top: var(--s-1); }
+.gw-rows, .gw-links { margin: 0 calc(-1 * var(--s-1)); }
+.gw-cap, .gw-link { width: 100%; text-align: left; padding: var(--s-2) var(--s-1); border-radius: var(--r-well); color: var(--ink); }
+.gw-cap .grow { display: grid; }
+.gw-cap .amt { font-weight: 600; }
+.gw-cap svg, .gw-link svg { flex: none; color: var(--ink-3); }
+.gw-cap:active, .gw-link:active { background: var(--fill); }
+.gw-links .row { box-shadow: 0 -.5px 0 var(--hair); }
+
+/* Meter: one track, both tick labels below it. Segments are separated by a 2px gap. */
+.gw-meter { position: relative; padding: var(--s-1) 0 18px; }
+.gw-track { display: flex; gap: 2px; height: 14px; border-radius: var(--r-pill); background: var(--fill-2); overflow: hidden; }
+.gw-track i { display: block; height: 100%; flex: none; }
+.gw-track.hidden { background: repeating-linear-gradient(135deg, var(--fill-2) 0 6px, var(--fill) 6px 12px); }
+.gw-tick { position: absolute; top: 0; height: calc(var(--s-1) + 18px); width: 2px; margin-left: -1px; background: var(--ink); border-radius: 1px; }
+.gw-tick.usual { background: var(--ink-3); }
+.gw-tick b { position: absolute; top: 100%; left: 50%; translate: -50% 0; white-space: nowrap; color: var(--ink-2); line-height: 1.2; }
+.gw-tick.l b { left: auto; right: 4px; translate: none; }
+.gw-tick.r b { left: 4px; translate: none; }
+.gw-tick.low b { top: calc(100% + 1.2em); }
+.gw-meter:has(.low) { padding-bottom: calc(18px + 1.2em); }
+.gw-meter { margin-bottom: var(--s-1); }
+.gw-legend { display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-3); }
+.gw-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.gw-legend b { color: var(--ink); font-weight: 600; }
+
+/* Weekly save (fallback sheet when core has no settings sheet) */
+.gw-save { display: grid; gap: var(--s-3); }
+.gw-save-sub { margin: 0; }
+.gw-save-opts { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.gw-save-opts .chip { min-height: var(--tap); padding: 0 var(--s-4); }
+
+/* ---------- Sheet flow ---------- */
+.gw-stage { display: flex; flex-direction: column; }
+.gw-step { display: flex; flex-direction: column; }
+.gw-step.center { align-items: center; text-align: center; }
+.gw-step h2 { margin: var(--s-2) 0 var(--s-2); text-wrap: balance; }
+.gw-step.center h2 { margin-left: var(--s-6); margin-right: var(--s-6); }
+.gw-hint { margin: 0 var(--s-2) var(--s-3); text-wrap: balance; }
+
+/* Dial */
+.gw-dial { position: relative; width: min(290px, 100%); aspect-ratio: 1; margin: var(--s-1) 0; touch-action: none; user-select: none; -webkit-user-select: none; border-radius: 50%; }
+.gw-dial svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.gw-dial .val { position: absolute; inset: 0; display: grid; place-content: center; gap: 6px; pointer-events: none; }
+.gw-arc-track { fill: none; stroke: var(--fill-2); stroke-width: 22; stroke-linecap: round; }
+.gw-arc-fill { fill: none; stroke: var(--ink); stroke-width: 22; stroke-linecap: round; }
+.gw-tickmark { stroke: var(--ink-4); stroke-width: 2; stroke-linecap: round; }
+.gw-thumb { fill: var(--surface); stroke: var(--ink-2); stroke-width: 2; cursor: grab; filter: drop-shadow(0 3px 6px var(--fill-2)); }
+.gw-nudge { display: flex; gap: var(--s-3); margin: var(--s-2) 0 var(--s-3); }
+.gw-nudge .btn { min-width: 72px; min-height: var(--tap); padding: 0 var(--s-4); }
+
+/* Reveal: the digit roll */
+.gw-roll { display: inline-flex; margin-top: var(--s-6); color: var(--ink); }
+.gw-dg { display: inline-block; height: 1em; overflow: hidden; }
+.gw-reel { display: block; will-change: transform; }
+.gw-reel > span { display: block; height: 1em; line-height: 1em; text-align: center; }
+.gw-guessline { margin: var(--s-3) 0 0; }
+.gw-guessline b { color: var(--ink); font-weight: 600; }
+.gw-bars { width: 100%; margin: var(--s-6) 0 var(--s-2); display: grid; gap: var(--s-4); text-align: left; }
+.gw-bar .top { display: flex; justify-content: space-between; color: var(--ink-2); margin-bottom: 6px; }
+.gw-bar .top b { color: var(--ink); font-weight: 600; }
+.gw-bar .track { position: relative; height: 14px; border-radius: var(--r-pill); background: var(--fill); display: flex; gap: 2px; overflow: visible; }
+.gw-bar .track i { display: block; height: 100%; flex: none; }
+.gw-bar .track i:first-child { border-radius: var(--r-pill) 0 0 var(--r-pill); }
+.gw-bar .track i:last-of-type { border-top-right-radius: var(--r-pill); border-bottom-right-radius: var(--r-pill); }
+.gw-bar .track i.usual { background: var(--ink-4); }
+.gw-bar .track .cap { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--ink); border-radius: 1px; }
+.gw-reveal .gw-legend { justify-content: center; width: 100%; }
+.gw-capkey { width: 2px; height: 12px; background: var(--ink); border-radius: 1px; }
+.gw-delta { margin: var(--s-5) 0 var(--s-2); display: grid; gap: 2px; }
+.gw-delta p { margin: 0; }
+
+/* Receipt */
+.gw-printer { width: 100%; position: relative; margin-top: var(--s-2); }
+.gw-slot { height: 12px; border-radius: var(--r-pill); background: var(--ink); margin: 0 var(--s-1); position: relative; z-index: 2; }
+.gw-paper { margin: -4px var(--s-4) 0; background: var(--surface); color: var(--ink); text-align: left; padding: var(--s-5) var(--s-5) var(--s-8); position: relative; z-index: 1;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .765rem; line-height: 1.385; font-variant-numeric: tabular-nums;
+  box-shadow: var(--shadow-card);
+  -webkit-mask: linear-gradient(black 0 0) top/100% calc(100% - 10px) no-repeat, radial-gradient(circle at 8px 0, transparent 7px, black 7.5px) bottom/16px 10px repeat-x;
+          mask: linear-gradient(black 0 0) top/100% calc(100% - 10px) no-repeat, radial-gradient(circle at 8px 0, transparent 7px, black 7.5px) bottom/16px 10px repeat-x; }
+.gw-paper .head { text-align: center; margin-bottom: var(--s-3); display: grid; gap: 2px; }
+.gw-paper .head b { font-size: .882rem; }
+.gw-paper .head span { color: var(--ink-2); }
+.gw-paper .ln { display: flex; justify-content: space-between; gap: var(--s-3); padding: 3px 0; }
+.gw-paper .ln.sub { color: var(--ink-2); padding-left: var(--s-3); }
+.gw-paper .ln.sub.flush { padding-left: 0; }
+.gw-paper .ln.group { font-weight: 700; margin-top: var(--s-2); }
+.gw-paper .ln.total { font-size: .882rem; font-weight: 700; }
+.gw-paper .rule { border-top: 1.5px dashed var(--ink-4); margin: var(--s-3) 0; }
+.gw-paper .fine { margin: var(--s-1) 0 var(--s-2); color: var(--ink-2); }
+.gw-paper .swapbox { margin: var(--s-3) 0; border: 1.5px solid var(--ink); border-radius: var(--r-well); padding: var(--s-3); display: flex; align-items: center; gap: var(--s-3); }
+.gw-paper .swapbox > div { display: grid; gap: 2px; min-width: 0; }
+.gw-paper .swapbox span { color: var(--ink-2); }
+.gw-paper .swapbox b { font-size: .882rem; }
+.gw-paper .barcode { height: 34px; margin: var(--s-4) auto 0; width: 70%;
+  background: repeating-linear-gradient(90deg, var(--ink) 0 2px, transparent 2px 4px, var(--ink) 4px 5px, transparent 5px 8px, var(--ink) 8px 11px, transparent 11px 12px); }
+
+/* Share */
+.gw-story-wrap { width: min(220px, 62%); aspect-ratio: 9 / 16; border-radius: var(--r-tile); overflow: hidden; background: var(--fill); box-shadow: var(--shadow-card); display: grid; place-items: center; }
+.gw-story { display: block; width: 100%; height: 100%; object-fit: cover; }
+.gw-share-status { min-height: 1.4em; margin: var(--s-3) 0 0; color: var(--ink-2); }
+.gw-share-status.bad { color: var(--ink); font-weight: 600; }
+
+@media (prefers-reduced-motion: reduce) {
+  .gw-reel { will-change: auto; }
+}
+
+/* Reveal follow-ups: hidden until the number lands, then fade up. */
+.gw-guessline, .gw-bars, .gw-legend, .gw-delta { transition: opacity 220ms ease-out, translate 220ms ease-out; }
+.gw-hold { opacity: 0; translate: 0 6px; }
+@media (prefers-reduced-motion: reduce) { .gw-hold { translate: none; } }
+
+/* At large text the cap amount drops under its formula instead of squeezing it. */
+.gw-cap { flex-wrap: wrap; row-gap: 0; }
+.gw-cap .grow { flex: 1 1 9rem; }
+.gw-cap .amt { margin-left: auto; }

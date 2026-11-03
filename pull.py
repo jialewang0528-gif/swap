@@ -58,7 +58,11 @@ DELIVERY_PATTERN = re.compile(
 RIDE_PATTERN = re.compile(r"\buber\b|\blyft\b|\bcurb\b", re.IGNORECASE)
 # One lower-fare ride app's charges put the driver's name in the text and Plaid files them as
 # LOAN_PAYMENTS_CASH_ADVANCES, so they're matched on the app's billing tag instead of the category.
-CHEAP_RIDE_APP_PATTERN = re.compile(r"driverideapp", re.IGNORECASE)
+# While a ride is pending the bank shows a hold ("RIDEAPP* HOLDFORDRIVER") instead of the billing tag.
+CHEAP_RIDE_APP_PATTERN = re.compile(r"driverideapp|rideapp\*\s*holdfordriver", re.IGNORECASE)
+# Alcohol: bars and liquor stores, plus delis, bodegas and convenience stores (where the beer is).
+# Card networks file a pending liquor-store charge as general merchandise, so names count too.
+DRINKS_PATTERN = re.compile(r"\bwine\b|liquor|spirits|\bbeer\b|bodega|\bdeli\b|mini\s*mar(ke)?t|go\s*mart|7-?eleven", re.IGNORECASE)
 # Monthly passes like DashPass are a fixed cost, not an order, so they're counted separately.
 MEMBERSHIP_PATTERN = re.compile(r"dashpass|uber\s*one|grubhub\s*\+|grubhub\s*plus|lyft\s*pink", re.IGNORECASE)
 
@@ -67,7 +71,8 @@ INTERCITY_PATTERN = re.compile(r"amtrak|nj\s*transit|flix|greyhound|megabus|pete
 # Plaid category -> kind, for food and getting around that isn't delivery or a ride.
 CATEGORY_KINDS = {
     "FOOD_AND_DRINK_RESTAURANT": "dining",
-    "FOOD_AND_DRINK_BEER_WINE_AND_LIQUOR": "dining",
+    "FOOD_AND_DRINK_BEER_WINE_AND_LIQUOR": "drinks",
+    "GENERAL_MERCHANDISE_CONVENIENCE_STORES": "drinks",
     "FOOD_AND_DRINK_GROCERIES": "groceries",
     "TRANSPORTATION_PUBLIC_TRANSIT": "transit",
     "TRANSPORTATION_BIKES_AND_SCOOTERS": "transit",
@@ -77,8 +82,8 @@ CATEGORY_KINDS = {
 def classify(txn):
     """Return the kind of food or getting-around charge, or None to drop it.
 
-    Kinds: membership, delivery, ride, dining (restaurants and bars), quick_food
-    (fast food, coffee, snacks, vending), groceries, transit (subway, bus, bikes).
+    Kinds: membership, delivery, ride, dining (restaurants), drinks (bars, liquor stores, delis and
+    bodegas), quick_food (fast food, coffee, snacks, vending), groceries, transit (subway, bus, bikes).
     """
     category = (txn.get("personal_finance_category") or {}).get("detailed") or ""
     counterparties = txn.get("counterparties") or []
@@ -101,6 +106,8 @@ def classify(txn):
     # Old and new Plaid category lists both contain this phrase.
     if "TAXIS_AND_RIDE_SHARES" in category or RIDE_PATTERN.search(text):
         return "ride"
+    if DRINKS_PATTERN.search(text) and not category.startswith("FOOD_AND_DRINK_RESTAURANT"):
+        return "drinks"
     if category in CATEGORY_KINDS:
         # Trains and buses out of the city are trips, not getting around day to day.
         if CATEGORY_KINDS[category] == "transit" and INTERCITY_PATTERN.search(text):

@@ -1,0 +1,398 @@
+/* Swap core: design tokens, app shell (nav bar, tab bar, sheets), shared components.
+   Feature CSS (features/<id>.css) uses these tokens only: no raw hex, no one-off radii or font sizes.
+   See DESIGN.md for the rules. */
+:root {
+  /* ---------- Color: neutrals ---------- */
+  --ink: #14162a;            /* text, primary buttons, selected tab, focus ring */
+  --ink-2: #4a4f66;          /* secondary text (7.4:1 on canvas) */
+  --ink-3: #565c74;          /* tertiary text, meta (6.1:1) */
+  --ink-4: rgba(20, 22, 42, .38);  /* disabled, control borders (3:1+) */
+  --hair: rgba(20, 22, 42, .08);   /* hairlines, inset borders */
+  --fill: rgba(20, 22, 42, .05);   /* neutral fills: tint buttons, tracks, badges */
+  --fill-2: rgba(20, 22, 42, .09);
+  --canvas: #f6f5f9;
+  --surface: #ffffff;        /* content cards */
+  --surface-2: #fbfbfd;      /* nested tiles inside a card */
+  --sheet-bg: #f7f6fa;       /* full-height sheets (opaque, like iOS large detent) */
+
+  /* ---------- Color: 4 hues. Fill (>=3:1 on white) / soft tint / ink (text on tint) ---------- */
+  --food: #e46c35;   --food-soft: #ffe6d9;  --food-ink: #9a4a26;
+  --move: #4a5fd8;   --move-soft: #e3e7ff;  --move-ink: #2f3ca0;
+  --night: #8f6fdc;  --night-soft: #eee8ff; --night-ink: #4a3a92;
+  --accent: #2e9e6a; --accent-soft: #dcf5e8; --accent-ink: #1d6b47;   /* saved / room / done. Never "move". */
+  /* Night is never color-only: hatched fill + moon icon (api.kindIcon("night")). */
+  --night-pattern: repeating-linear-gradient(135deg, var(--night) 0 3px, #b9a5ec 3px 5.5px);
+  /* Legacy aliases (features being rebuilt still use these) */
+  --mint: var(--accent); --mint-soft: var(--accent-soft); --mint-ink: var(--accent-ink);
+
+  /* ---------- Materials ---------- */
+  /* Content layer: solid card + soft layered shadow. Floating layer: Liquid Glass. */
+  --shadow-card: 0 0 0 .5px rgba(20, 22, 42, .05), 0 1px 2px rgba(20, 22, 42, .04), 0 8px 24px -12px rgba(20, 22, 42, .14);
+  --shadow-float: 0 8px 28px -8px rgba(20, 22, 42, .2), 0 2px 6px rgba(20, 22, 42, .06);
+  --glass: rgba(255, 255, 255, .56);
+  --glass-strong: rgba(255, 255, 255, .74);
+  --glass-edge: rgba(255, 255, 255, .85);
+  --glass-blur: blur(18px) saturate(180%);
+  --glass-shadow: var(--shadow-float);
+
+  /* ---------- Radius: 5 values (concentric: inner = outer - padding) ---------- */
+  --r-pill: 999px;   /* buttons, chips, tab bar, capsules */
+  --r-card: 26px;    /* content cards */
+  --r-tile: 16px;    /* tiles inside a card (26 - 10 padding) */
+  --r-well: 10px;    /* icon wells, small fields */
+  --r-badge: 6px;    /* badges */
+  --r-lg: var(--r-card); --r-md: 20px; --r-sm: var(--r-tile);   /* legacy */
+
+  /* ---------- Type ---------- */
+  --sys: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Helvetica Neue", Arial, sans-serif;
+  --round: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+
+  /* ---------- Spacing: 4pt grid ---------- */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px; --s-6: 24px; --s-8: 32px; --s-11: 44px;
+  --gutter: 16px;    /* screen side margin */
+  --tap: 44px;       /* minimum touch target */
+
+  /* ---------- Motion (core.js replaces these with sampled springs) ---------- */
+  --ease-snappy: cubic-bezier(.2, .9, .3, 1);   --dur-snappy: 320ms;
+  --ease-standard: cubic-bezier(.2, .9, .25, 1.08); --dur-standard: 520ms;
+  --ease-gentle: cubic-bezier(.32, .72, 0, 1);  --dur-gentle: 560ms;
+  --fade: 150ms;
+
+  /* ---------- Device geometry ---------- */
+  --top: 54px;       /* status bar height inside the desktop frame */
+  --bottom: 34px;    /* home indicator */
+  --nav-h: 44px;     /* compact nav row */
+  --p: 0;            /* large-title collapse progress 0..1 (set by core.js) */
+  --edge: 0;         /* top scroll-edge strength 0..1 */
+  --pull: 0;         /* overscroll pull-down 0..1 */
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; }
+@supports (height: 100dvh) { html, body { height: 100dvh; } }
+/* 1rem = the reader's body size: 17px by default, and the iOS Text Size setting on iPhone (below). */
+html { font-size: 106.25%; }
+body { font-family: var(--sys); font-size: 1rem; line-height: 1.3; color: var(--ink); -webkit-font-smoothing: antialiased; background: #eceef4; -webkit-text-size-adjust: 100%; }
+::selection { background: var(--move-soft); color: var(--ink); }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 10px; }
+button { font: inherit; color: inherit; border: 0; background: none; padding: 0; cursor: pointer; }
+input, textarea { font: inherit; color: inherit; }
+h1, h2, h3, p { overflow-wrap: break-word; }
+/* Headings get focus only so screen readers land on them; no ring box for that. */
+:is(h1, h2, h3)[tabindex="-1"]:focus { outline: none; }
+.vh { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* ---------- Type scale (iOS Dynamic Type "Large", 1rem = 17px) ---------- */
+.t-largetitle { font-size: 2rem;     line-height: 1.206; font-weight: 700; letter-spacing: normal; }   /* 34/41 */
+.t-title      { font-size: 1.647rem; line-height: 1.214; font-weight: 700; }   /* 28/34 */
+.t-title2     { font-size: 1.294rem; line-height: 1.273; font-weight: 700; }   /* 22/28 */
+.t-title3     { font-size: 1.176rem; line-height: 1.25;  font-weight: 600; }   /* 20/25 */
+.t-headline   { font-size: 1rem;     line-height: 1.294; font-weight: 600; }   /* 17/22 */
+.t-body       { font-size: 1rem;     line-height: 1.294; font-weight: 400; }   /* 17/22 */
+.t-sub        { font-size: .882rem;  line-height: 1.333; font-weight: 400; }   /* 15/20 */
+.t-foot       { font-size: .765rem;  line-height: 1.385; font-weight: 400; }   /* 13/18 */
+.t-cap        { font-size: .647rem;  line-height: 1.182; font-weight: 600; }   /* 11/13 */
+.t-2 { color: var(--ink-2); } .t-3 { color: var(--ink-3); }
+/* Money numerals: SF Rounded, tabular so widths never jump. */
+.num { font-family: var(--round); font-variant-numeric: tabular-nums; }
+.n-xl, .n-l, .n-m { font-family: var(--round); font-variant-numeric: tabular-nums; font-weight: 700; line-height: 1; }
+/* Scale with text size, but never wider than the phone allows. */
+.n-xl { font-size: min(3.765rem, 19vw); letter-spacing: -0.03em; }   /* 64 */
+.n-l  { font-size: min(2.353rem, 13vw); letter-spacing: -0.03em; }   /* 40 */
+.n-m  { font-size: min(1.647rem, 10vw); letter-spacing: -0.01em; }   /* 28 */
+
+/* ---------- Desktop stage ---------- */
+.stage { min-height: 100%; height: 100%; display: grid; grid-template-columns: minmax(280px, 380px) auto; gap: 64px; align-items: center; justify-content: center; padding: 24px 28px; }
+.panel { max-height: 100%; overflow-y: auto; padding: 8px 4px; scrollbar-width: none; }
+.panel h1 { font-size: 40px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; line-height: 1; display: flex; align-items: center; gap: 12px; }
+.panel .lede { color: var(--ink-2); font-size: 16px; line-height: 1.5; margin: 0 0 20px; max-width: 36ch; }
+.panel h2 { font-size: 13px; font-weight: 600; color: var(--ink-3); margin: 20px 4px 8px; }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 3px; border-radius: 12px; background: var(--fill-2); }
+.seg button { min-height: 44px; border-radius: 9px; font-size: 13px; font-weight: 600; color: var(--ink-2); display: grid; place-items: center; gap: 0; line-height: 1.2; padding: 4px 6px; transition: background var(--fade), color var(--fade); }
+.seg button small { font-size: 11px; font-weight: 500; color: var(--ink-3); }
+.seg button[aria-checked="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(20,22,42,.12), 0 0 0 .5px rgba(20,22,42,.04); }
+.feature-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.feature-list button { width: 100%; text-align: left; padding: 10px 12px; border-radius: 14px; display: grid; gap: 2px; transition: background .2s; }
+@media (hover: hover) { .feature-list button:hover { background: rgba(255,255,255,.7); } }
+.feature-list button[aria-current="true"] { background: var(--surface); box-shadow: var(--shadow-card); }
+.feature-list strong { font-size: 15px; font-weight: 600; }
+.feature-list span { font-size: 13px; color: var(--ink-2); line-height: 1.4; }
+.panel .fine { margin-top: 18px; font-size: 12px; color: var(--ink-3); line-height: 1.5; max-width: 40ch; }
+.panel .fine a, .panel .fine .linkish { color: var(--ink-2); text-underline-offset: 3px; text-decoration: underline; font-size: inherit; }
+.install { margin-top: 18px; display: flex; gap: 14px; align-items: center; font-size: 13px; color: var(--ink-2); line-height: 1.4; }
+.install .qr { width: 96px; height: 96px; border-radius: 14px; background: #fff; padding: 6px; flex: none; box-shadow: var(--shadow-card); }
+.install .qr img, .install .qr canvas { display: block; width: 84px; height: 84px; }
+.install b { color: var(--ink); font-weight: 600; }
+
+.device { width: 402px; height: 874px; border-radius: 62px; position: relative; overflow: hidden; background: var(--canvas); flex: none;
+  box-shadow: 0 0 0 11px #121216, 0 0 0 12.5px #3a3a40, 0 40px 80px -20px rgba(20, 22, 50, .45); isolation: isolate;
+  scale: var(--device-scale, 1); }
+.island { position: absolute; top: 11px; left: 50%; translate: -50% 0; width: 126px; height: 37px; border-radius: 20px; background: #000; z-index: 50; }
+.statusbar { position: absolute; inset: 0 0 auto 0; height: var(--top); display: flex; justify-content: space-between; align-items: center; padding: 16px 32px 0 40px; font-weight: 600; font-size: 17px; z-index: 40; pointer-events: none; }
+.homebar { position: absolute; bottom: 8px; left: 50%; translate: -50% 0; width: 140px; height: 5px; border-radius: 3px; background: rgba(0,0,0,.85); z-index: 60; pointer-events: none; }
+
+/* Phone layout: narrow screens, the installed app, and any touch-only device. The app is the page. */
+@media (max-width: 640px), (display-mode: standalone), (hover: none) and (pointer: coarse) {
+  .stage { display: block; padding: 0; height: 100%; }
+  .panel { display: none; }
+  .device { width: 100%; height: 100%; border-radius: 0; box-shadow: none; scale: none; }
+  .island, .statusbar, .homebar { display: none; }
+  :root { --top: max(env(safe-area-inset-top), 12px); --bottom: max(env(safe-area-inset-bottom), 10px); }
+}
+/* Text Size on iPhone (WebKit, incl. the native app's WKWebView): the system body size becomes 1rem,
+   so every rem token follows the setting (17px at the default). Desktop Safari keeps 17px. */
+@media (hover: none) and (pointer: coarse), (display-mode: standalone) {
+  @supports (font: -apple-system-body) { html { font: -apple-system-body; } body { font-family: var(--sys); line-height: 1.3; } }
+}
+
+/* ---------- App shell ---------- */
+.app { position: absolute; inset: 0; overflow: hidden; overflow: clip; color: var(--ink); background: var(--canvas); }
+/* Low-chroma wall so the glass layers have something to refract. Two blobs, top only. */
+.wall { position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(60% 28% at 8% 0%, rgba(255, 214, 192, .55) 0%, transparent 70%),
+    radial-gradient(55% 26% at 96% 4%, rgba(208, 216, 255, .55) 0%, transparent 72%),
+    var(--canvas); }
+.views { position: absolute; inset: 0; z-index: 1; overflow: hidden; overflow: clip; display: block; }
+.view { position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
+  padding: calc(var(--top) + var(--nav-h) + 2px) var(--gutter) calc(var(--bottom) + 110px);
+  scroll-padding: calc(var(--top) + var(--nav-h) + 8px) 0 calc(var(--bottom) + 90px);
+  scrollbar-width: none; overscroll-behavior: contain; opacity: 0; pointer-events: none; transition: opacity var(--fade) linear; }
+.view::-webkit-scrollbar { display: none; }
+.view.on { opacity: 1; pointer-events: auto; }
+/* Large title: fades out as the compact title fades in; grows a little on pull-down like iOS. */
+.view > .lt { margin: 0 4px 16px; transform-origin: 0 50%; }
+.view > .lt h1 { margin: 0; opacity: max(0, calc(1 - var(--p) * 1.5)); scale: calc(1 + var(--pull) * .08); transform-origin: 0 100%; }
+.view > .lt .lt-sub { margin: 2px 0 0; color: var(--ink-2); opacity: max(0, calc(1 - var(--p) * 2)); }
+.view > header:not(.lt) { display: flex; justify-content: space-between; align-items: flex-end; margin: 6px 4px 16px; }  /* legacy */
+.slot + .slot { margin-top: var(--s-5); }
+.slot:empty { display: none; }
+
+/* Compact nav bar: soft blur + fade edge, compact title, trailing glass buttons. */
+.navbar { position: absolute; inset: 0 0 auto 0; z-index: 15; height: calc(var(--top) + var(--nav-h)); pointer-events: none; }
+/* Scrolled: a solid, blurred bar exactly as tall as the nav, so content never shows through the compact title. */
+.nav-edge { position: absolute; inset: 0; opacity: var(--edge);
+  background: rgba(246, 245, 249, .9); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: 0 .5px 0 var(--hair); }
+.nav-row { position: absolute; left: 0; right: 0; top: var(--top); height: var(--nav-h); display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 0 var(--gutter); }
+.nav-title { position: absolute; left: 50%; top: 50%; translate: -50% -50%; max-width: 46%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: min(1rem, 20px); font-weight: 600; opacity: clamp(0, calc((var(--p) - .45) * 2.2), 1); }
+.nav-actions { display: none; gap: 8px; align-items: center; pointer-events: auto; }
+.nav-actions.on { display: flex; }
+.nav-btn { min-width: var(--tap); height: var(--tap); padding: 0 14px 0 12px; border-radius: var(--r-pill); display: inline-flex; align-items: center; gap: 6px; font-size: .882rem; font-weight: 600; color: var(--ink); }
+.nav-btn .av { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: #fff; font-size: 11px; font-weight: 700; flex: none; }
+.nav-btn .av.sample { background: var(--fill-2); color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink-4); }
+.nav-btn svg { flex: none; }
+/* You: one avatar button, top right on every tab. 44pt target, 32pt avatar. */
+.nav-me { width: var(--tap); height: var(--tap); border-radius: 50%; display: grid; place-items: center; pointer-events: auto; flex: none; }
+.nav-me .av { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: #fff; font-size: 14px; font-weight: 700; }
+.nav-me .av.sample { background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink-3); }
+/* Bottom edge: content softens as it slides under the tab bar. */
+.edge-bottom { position: absolute; inset: auto 0 0 0; height: calc(var(--bottom) + 84px); z-index: 14; pointer-events: none;
+  background: linear-gradient(rgba(246, 245, 249, 0), rgba(246, 245, 249, .7) 70%, rgba(246, 245, 249, .85)); }
+.app.kb .edge-bottom { opacity: 0; }
+
+/* ---------- Materials ---------- */
+/* Liquid Glass: floating controls ONLY (tab bar, nav buttons, sheet chrome, toast, composer, deck buttons). */
+.glass { background: var(--glass); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  border-radius: var(--r-card); box-shadow: var(--shadow-float), inset 0 1px 0 var(--glass-edge), inset 0 0 0 .5px rgba(255,255,255,.5);
+  outline: 1px solid transparent; outline-offset: -1px; }
+.glass.strong { background: var(--glass-strong); }
+/* Content card: solid surface. Use for every content block. */
+.card { background: var(--surface); border-radius: var(--r-card); box-shadow: var(--shadow-card); padding: var(--s-4); }
+.card.hero { padding: var(--s-5); }
+.card.flat { padding: 0; overflow: hidden; }
+.surface { background: var(--surface); border-radius: var(--r-card); box-shadow: var(--shadow-card); }
+.tile { background: var(--surface-2); border-radius: var(--r-tile); box-shadow: inset 0 0 0 .5px var(--hair); padding: var(--s-3); }
+.pressable { transition: scale var(--dur-snappy) var(--ease-snappy); }
+.pressable:not(:disabled):active { scale: .97; }
+
+/* Lists: one line per item, name left, amount right (Flighty-style). */
+.list { display: grid; }
+.row { display: flex; align-items: center; gap: var(--s-3); min-height: var(--tap); padding: var(--s-2) 0; }
+.row + .row { box-shadow: 0 -.5px 0 var(--hair); }
+.row .grow { flex: 1; min-width: 0; }
+.row .amt { font-family: var(--round); font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* Section title: names the content ("By day"), never the feature. */
+.section-title { font-size: 1.176rem; font-weight: 600; line-height: 1.25; margin: 28px 4px 10px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.section-title small { font-size: .765rem; font-weight: 500; color: var(--ink-3); }
+.label { font-size: .765rem; color: var(--ink-2); }
+
+/* Honesty badges: one per section. Text differs, so it is never color-only. */
+.badge, .sample, .real { display: inline-flex; align-items: center; gap: 4px; font-size: .647rem; line-height: 1.18; font-weight: 600; border-radius: var(--r-badge); padding: 2px 6px; vertical-align: 2px; white-space: nowrap; letter-spacing: normal; }
+.sample, .badge.sample { color: var(--ink-2); background: var(--fill); box-shadow: inset 0 0 0 1px var(--fill-2); }
+.real, .badge.real { color: var(--ink); background: var(--surface); box-shadow: inset 0 0 0 1px rgba(20,22,42,.22); }
+
+/* Buttons: capsules, 50px tall (44 min). */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 50px; padding: 0 22px; border-radius: var(--r-pill); font-size: 1rem; font-weight: 600; line-height: 1.2;
+  transition: scale var(--dur-snappy) var(--ease-snappy), background var(--fade), opacity var(--fade); }
+.btn:not(:disabled):active { scale: .96; }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: .45; cursor: default; }
+.btn.primary { background: var(--ink); color: #fff; }
+.btn.secondary { background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 1px var(--hair), 0 1px 2px rgba(20,22,42,.06); }
+.btn.tint { background: var(--fill-2); color: var(--ink); }
+.btn.accent { background: var(--accent-soft); color: var(--accent-ink); }
+.btn.plain { background: none; color: var(--ink-2); min-height: var(--tap); padding: 0 12px; }
+.btn.glassy { background: var(--glass-strong); box-shadow: inset 0 1px 0 #fff, var(--shadow-float); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
+.btn.small { min-height: 36px; padding: 0 14px; font-size: .882rem; position: relative; }
+.btn.small::after { content: ""; position: absolute; inset: -4px 0; }
+.btn.block { width: 100%; }
+.icon-btn { width: var(--tap); height: var(--tap); border-radius: 50%; display: grid; place-items: center; flex: none; }
+
+/* Chips: 34px visual, 44px hit area. */
+.chip { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 14px; border-radius: var(--r-pill); font-size: .882rem; font-weight: 500;
+  background: var(--surface); box-shadow: inset 0 0 0 1px var(--hair); outline: 1px solid transparent; outline-offset: -1px;
+  transition: background var(--fade), color var(--fade), scale var(--dur-snappy) var(--ease-snappy); }
+.chip::after { content: ""; position: absolute; inset: -5px 0; }
+.chip[aria-pressed="true"], .chip[aria-checked="true"] { background: var(--ink); color: #fff; box-shadow: none; }
+.chip:not(:disabled):active { scale: .96; }
+
+/* Category marks: color + shape. Night is hatched and carries a moon. */
+.dot { width: 9px; height: 9px; border-radius: 3px; display: inline-block; flex: none; }
+.dot.food, .fill-food { background: var(--food); }
+.dot.move, .fill-move { background: var(--move); }
+.dot.night, .fill-night { background: var(--night-pattern); }
+.dot.move { border-radius: 50%; }
+.kind { width: 32px; height: 32px; border-radius: var(--r-well); display: grid; place-items: center; flex: none; }
+.kind.food { background: var(--food-soft); color: var(--food-ink); }
+.kind.move { background: var(--move-soft); color: var(--move-ink); }
+.kind.night { background: var(--night-soft); color: var(--night-ink); }
+.kind.saved { background: var(--accent-soft); color: var(--accent-ink); }
+.kind.lg { width: 40px; height: 40px; }
+
+/* ---------- Tab bar (floating glass capsule) ---------- */
+.tabbar { position: absolute; left: var(--gutter); right: var(--gutter); bottom: calc(var(--bottom) - 4px); height: 64px; z-index: 20; border-radius: 32px; padding: 6px;
+  transform-origin: 50% 100%; transition: scale var(--dur-standard) var(--ease-standard), opacity .2s; }
+.tabbar [role="tablist"] { position: relative; height: 100%; display: grid; grid-template-columns: repeat(var(--tabs, 4), 1fr); }
+.tabbar button { position: relative; z-index: 1; display: grid; place-items: center; align-content: center; gap: 1px; font-size: 10px; line-height: 12px; font-weight: 600; color: var(--ink-2); border-radius: 26px; transition: color .2s; }
+.tabbar button span { transition: opacity .2s; }
+.tabbar button[aria-selected="true"] { color: var(--ink); }
+.tabbar button svg { width: 24px; height: 24px; }
+.tabbar button:focus-visible { outline-offset: -3px; border-radius: 26px; }
+.tab-pill { position: absolute; top: 0; bottom: 0; left: 0; width: 25%; border-radius: 26px; background: rgba(255,255,255,.9); box-shadow: inset 0 1px 0 #fff, 0 2px 8px rgba(20,22,42,.1); z-index: 0;
+  transition: left var(--dur-standard) var(--ease-standard), width var(--dur-standard) var(--ease-standard); }
+/* Shrinks while scrolling down (iOS 26), restores on scroll up. */
+.app.tb-min .tabbar { scale: .86; }
+.app.tb-min .tabbar button span { opacity: 0; }
+.app.kb .tabbar { opacity: 0; pointer-events: none; }
+
+/* ---------- Sheets ---------- */
+.scrim { position: absolute; inset: 0; z-index: 30; background: rgba(20, 22, 50, .22); opacity: 0; transition: opacity .3s; }
+.scrim.on { opacity: 1; }
+/* Large detent: full height, opaque, attached to the edges. */
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; top: calc(var(--top) + 10px); z-index: 31; border-radius: 34px 34px 0 0; overflow: hidden; display: flex; flex-direction: column;
+  background: var(--sheet-bg); box-shadow: 0 -10px 40px rgba(20,22,50,.18); translate: 0 105%; }
+/* Medium detent: floats inset from the edges, Liquid Glass, height fits content. */
+.sheet.inset { left: 8px; right: 8px; bottom: calc(8px + max(0px, var(--bottom) - 34px)); top: auto; max-height: calc(100% - var(--top) - 24px); border-radius: 40px;
+  background: rgba(250, 250, 253, .86); -webkit-backdrop-filter: blur(30px) saturate(180%); backdrop-filter: blur(30px) saturate(180%);
+  box-shadow: 0 20px 50px -10px rgba(20,22,50,.3), inset 0 1px 0 #fff; }
+.sheet-chrome { flex: none; position: relative; height: 26px; z-index: 2; }
+.sheet .grab { position: absolute; inset: 0 60px 0 60px; height: 26px; display: grid; place-items: center; cursor: grab; touch-action: none; }
+.sheet .grab::before { content: ""; width: 38px; height: 5px; border-radius: 3px; background: rgba(20,22,42,.2); }
+.sheet .back { position: absolute; top: 6px; left: 10px; width: var(--tap); height: var(--tap); border-radius: 50%; display: grid; place-items: center; z-index: 3;
+  background: var(--glass-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: inset 0 1px 0 #fff, 0 1px 4px rgba(20,22,42,.12); color: var(--ink); }
+.sheet .back[hidden] { display: none; }
+.sheet .close { position: absolute; top: 6px; right: 10px; width: var(--tap); height: var(--tap); border-radius: 50%; display: grid; place-items: center; z-index: 3;
+  background: var(--glass-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: inset 0 1px 0 #fff, 0 1px 4px rgba(20,22,42,.12); color: var(--ink-2); }
+.sheet .body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 18px 20px calc(var(--bottom) + 20px); scrollbar-width: none; }
+.sheet.inset .body { flex: 0 1 auto; padding-bottom: 20px; }
+.sheet .body::-webkit-scrollbar { display: none; }
+.sheet .body > :is(h1, h2):first-child, .sheet-title { margin: 0 52px 6px 0; }
+.sheet:has(.sheet-chrome .back:not([hidden])) .body { padding-top: 30px; }
+.sheet-title:focus, .sheet .body :is(h1, h2, h3)[tabindex="-1"]:focus { outline: none; }
+/* Actions pinned at the bottom of the sheet (api.sheetActions). */
+.sheet.has-actions .body { padding-bottom: 12px; }
+.sheet-actions { flex: none; position: relative; display: flex; gap: 10px; padding: 10px 20px calc(var(--bottom) + 10px); z-index: 2; }
+.sheet-actions[hidden] { display: none; }
+.sheet-actions::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 24px; pointer-events: none; background: linear-gradient(rgba(247,246,250,0), var(--sheet-bg)); }
+.sheet.inset .sheet-actions { padding-bottom: 18px; }
+.sheet.inset .sheet-actions::before { display: none; }
+.sheet-actions .btn { flex: 1; }
+/* Inside a body, a .sheet-actions block sticks to the bottom instead. */
+.sheet .body .sheet-actions { position: sticky; bottom: calc(-1 * (var(--bottom) + 20px)); margin: 16px -20px calc(-1 * (var(--bottom) + 20px)); background: var(--sheet-bg); }
+
+/* Choice rows (profile picker and other single-choice lists) */
+.choices { display: grid; gap: 8px; margin: 12px 0 4px; }
+.choice { width: 100%; text-align: left; display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px 14px; border-radius: 20px; background: var(--surface); box-shadow: var(--shadow-card); transition: scale var(--dur-snappy) var(--ease-snappy); }
+.choice:active { scale: .98; }
+.choice .grow { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.choice .grow b { font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.choice .grow span { font-size: .882rem; color: var(--ink-2); line-height: 1.3; }
+.choice .tick { width: 24px; height: 24px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--ink-4); display: grid; place-items: center; color: transparent; flex: none; }
+.choice[aria-checked="true"] .tick { background: var(--ink); color: #fff; box-shadow: none; }
+
+/* ---------- Toast (floating glass, one persistent live region) ---------- */
+.toast { position: absolute; left: 50%; top: calc(var(--top) + 6px); translate: -50% calc(-100% - var(--top) - 24px); opacity: 0; z-index: 45; padding: 10px 16px; border-radius: 22px;
+  font-size: .882rem; font-weight: 600; width: max-content; max-width: calc(100% - 32px); pointer-events: none;
+  transition: translate var(--dur-gentle) var(--ease-gentle), opacity .25s; display: flex; gap: 8px; align-items: center; }
+.toast.on { translate: -50% 0; opacity: 1; }
+.toast svg { flex: none; }
+.toast.has-action.on { pointer-events: auto; padding-right: 6px; }
+.toast-act { min-height: 36px; padding: 0 14px; margin-left: 4px; border-radius: var(--r-pill); background: var(--ink); color: #fff; font-weight: 600; position: relative; }
+.toast-act::after { content: ""; position: absolute; inset: -4px; }
+.load-fail { display: grid; gap: var(--s-3); justify-items: start; }
+.load-fail p { margin: 0; }
+
+/* ---------- Preferences ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  .view, .scrim, .toast { transition-duration: 180ms !important; transition-property: opacity !important; }
+  .toast { translate: -50% 0; }
+  .view > .lt h1 { scale: none; }
+}
+@media (prefers-contrast: more), (prefers-reduced-transparency: reduce) {
+  :root { --glass: rgba(255,255,255,.96); --glass-strong: #fff; --ink-3: var(--ink-2); --hair: rgba(20,22,42,.2); }
+  .glass, .btn.glassy, .sheet.inset, .sheet .close { -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .nav-edge { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--canvas); -webkit-mask: none; mask: none; }
+  .sheet.inset { background: var(--sheet-bg); }
+}
+
+/* Merchant logos: App Store icon style (22% corner, hairline), letter tile, or the category glyph. */
+.brandmark { position: relative; width: var(--bm, 36px); height: var(--bm, 36px); flex: none; display: inline-grid; place-items: center; border-radius: 22%; overflow: hidden; background: #fff; }
+.brandmark::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgba(20, 22, 42, .1); pointer-events: none; }
+.brandmark img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.brandmark.letter { font-family: var(--round); font-weight: 700; font-size: calc(var(--bm, 36px) * .4); line-height: 1; letter-spacing: normal; }
+.brandmark.k-food { background: var(--food-soft); color: var(--food-ink); }
+.brandmark.k-move { background: var(--move-soft); color: var(--move-ink); }
+.brandmark.k-night { background: var(--night-soft); color: var(--night-ink); }
+.brandmark.generic { background: var(--fill); color: var(--ink-2); }
+
+/* ---------- Switch rows (You sheet, onboarding reminders) ---------- */
+.switch-row { width: 100%; text-align: left; display: flex; align-items: center; gap: var(--s-3); min-height: 64px; padding: var(--s-3) 0; border-radius: 0; }
+.switch-row + .switch-row { box-shadow: 0 -.5px 0 var(--hair); }
+.switch-row .grow { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.switch-row:focus-visible { outline-offset: -2px; border-radius: var(--r-tile); }
+.switch-row .well { width: 36px; height: 36px; border-radius: var(--r-well); display: grid; place-items: center; flex: none; background: var(--fill); color: var(--ink-2); }
+/* Off track keeps a 1.5px ink-3 ring (6:1 on white), so off is never invisible. */
+.switch { position: relative; width: 51px; height: 31px; flex: none; border-radius: var(--r-pill); background: var(--fill-2); box-shadow: inset 0 0 0 1.5px var(--ink-3); transition: background var(--fade), box-shadow var(--fade); }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: var(--surface); box-shadow: 0 2px 5px rgba(20, 22, 42, .2), 0 0 0 .5px var(--hair);
+  transition: translate var(--dur-snappy) var(--ease-snappy); }
+.switch-row[aria-checked="true"] .switch { background: var(--accent); box-shadow: none; }
+.switch-row[aria-checked="true"] .switch::after { translate: 20px 0; }
+.switch-row[aria-disabled="true"] { cursor: default; }
+.switch-row[aria-disabled="true"] .switch { opacity: .55; }
+
+/* ---------- You sheet (core.js youSheet) ---------- */
+.you-sub { margin: 0 0 var(--s-2); }
+.you-sec { display: grid; gap: var(--s-2); margin-top: var(--s-6); }
+.you-h { margin: 0 4px; }
+.you-save { display: grid; gap: var(--s-4); }
+.you-stepper { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); }
+.you-step { background: var(--fill-2); color: var(--ink); }
+.you-step:disabled { opacity: .4; cursor: default; }
+.you-amt { display: grid; justify-items: center; gap: 2px; min-width: 0; }
+.you-presets { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.you-presets .chip { flex: 1 1 4rem; justify-content: center; }
+.you-presets .chip:disabled { opacity: .45; }
+.you-cap { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-1) var(--s-3); padding-top: var(--s-3); box-shadow: 0 -.5px 0 var(--hair); }
+.you-cap .grow { flex: 1 1 10rem; min-width: 0; display: grid; gap: 2px; }
+.you-help, .you-note { margin: 0; }
+.you-note { padding: 0 4px; }
+.you-list { padding: 0 var(--s-4); }
+.you-qs { display: grid; gap: var(--s-4); }
+.you-q { display: grid; gap: var(--s-2); }
+.you-opts { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.you-who { margin: 0; }
+.you-who .choice[aria-current="true"] .tick { background: var(--ink); color: #fff; box-shadow: none; }
+.you-again { margin-top: var(--s-6); }

@@ -7,3 +7,9 @@ reports/
 .claude/
 .codex/
 .DS_Store
+.impeccable/
+ios/build/
+xcuserdata/
+*.xcuserstate
+app/private/*
+!app/private/*.example.js

@@ -1,0 +1,41 @@
+/* Daily plan: today's room, the week so far, plan vs spent per day. Tokens only. */
+.td { display: grid; gap: var(--s-3); }
+.td-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--s-3); }
+.td-top > div { display: grid; gap: 2px; min-width: 0; }
+.td-big { font-size: 2.353rem; font-weight: 700; line-height: 1.05; letter-spacing: -.01em; color: var(--accent-ink); }
+.td-big.over { color: var(--food-ink); }
+.td-week { text-align: right; }
+.td-week b { font-size: 1.059rem; font-weight: 700; }
+.td-bad { color: var(--food-ink); }
+
+.td-meter { height: 8px; border-radius: var(--r-pill); background: var(--fill-2); overflow: hidden; }
+.td-meter i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.td-meter.over i { background: var(--food); }
+
+.td-strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; padding-top: var(--s-1); }
+.td-day { display: grid; justify-items: center; gap: 6px; min-width: 0; }
+.td-cap { position: relative; width: 12px; height: 64px; border-radius: var(--r-pill); background: var(--fill-2); overflow: hidden; }
+.td-cap i { position: absolute; left: 0; right: 0; bottom: 0; border-radius: inherit; background: var(--accent); }
+.td-day.over .td-cap i { background: var(--food); }
+.td-day b { color: var(--ink-3); font-weight: 600; }
+.td-day.on b { color: var(--ink); }
+.td-day.on .td-cap { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--ink); }
+.td-amt { color: var(--ink-3); font-weight: 500; white-space: nowrap; }
+.td-day.past .td-amt, .td-day.on .td-amt { color: var(--ink); font-weight: 600; }
+
+.td-legend { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--s-1) var(--s-3); margin: 0; }
+.td-status { color: var(--ink-2); font-weight: 600; }
+.td-h { margin: var(--s-1) 0 0; font-weight: 600; color: var(--ink-2); }
+.td-none, .td-fine { margin: 0; }
+.td-tx { display: block; overflow-wrap: anywhere; }
+.list .row .grow:has(.td-tx) { display: grid; }
+.td-in { color: var(--accent-ink); }
+.td-mono { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--r-well);
+  background: var(--fill-2); color: var(--ink-2); font-family: var(--round); font-weight: 700; font-size: .824rem; }
+.td-mono.in { background: var(--accent-soft); color: var(--accent-ink); }
+/* Days are buttons: tap to list that day's charges. */
+.td-day { border: 0; background: none; padding: var(--s-2) 0; border-radius: var(--r-tile); cursor: pointer; font: inherit; color: inherit;
+  -webkit-tap-highlight-color: transparent; transition: background var(--fade); }
+.td-day[aria-pressed="true"] { background: var(--fill); }
+.td-day:not(:disabled):active { scale: .96; }
+.td-h { display: flex; justify-content: space-between; gap: var(--s-2); }

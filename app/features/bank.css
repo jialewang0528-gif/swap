@@ -1,0 +1,31 @@
+/* Whole bank: every dollar in and out. Tokens only. */
+.bk { display: grid; gap: var(--s-3); }
+.bk-seg { margin: 0; grid-template-columns: 1fr 1fr; }
+.bk-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: var(--s-2); }
+.bk-stats > div { display: grid; gap: 2px; }
+.bk-stats b { font-size: 1.412rem; font-weight: 700; line-height: 1.15; }
+.bk-note { margin: 0; }
+.bk-h { margin: var(--s-2) 0 0; font-weight: 600; color: var(--ink-2); }
+.bk-list { display: grid; }
+.bk-cat { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) auto; align-items: center; gap: var(--s-3); min-height: 36px; }
+.bk-cat + .bk-cat { box-shadow: 0 -.5px 0 var(--hair); }
+.bk-list .bk-cat:has(> :nth-child(2):last-child) { grid-template-columns: minmax(0, 1fr) auto; }
+.bk-name { min-width: 0; overflow-wrap: anywhere; }
+.bk-track { height: 8px; border-radius: var(--r-pill); background: var(--fill); overflow: hidden; }
+.bk-track i { display: block; height: 100%; border-radius: inherit; background: var(--ink-4); }
+.bk-track i.food { background: var(--food); }
+.bk-track i.move { background: var(--move); }
+.bk-amt { font-weight: 600; text-align: right; }
+.bk-in { color: var(--accent-ink); }
+.bk-empty { margin: 0; }
+.bk-all { margin-top: var(--s-1); }
+.bk-fine { margin: 0; }
+
+.bk-sheet-title { margin: 0 0 2px; }
+.bk-day { margin-top: var(--s-6); }
+.bk-day-card { padding: var(--s-1) var(--s-4); }
+.bk-tx { display: block; overflow-wrap: anywhere; }
+.bk-day-card .grow { display: grid; }
+.bk-mono { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--r-well);
+  background: var(--fill-2); color: var(--ink-2); font-family: var(--round); font-weight: 700; font-size: .882rem; }
+.bk-mono.in { background: var(--accent-soft); color: var(--accent-ink); }

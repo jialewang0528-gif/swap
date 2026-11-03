@@ -1,0 +1,62 @@
+/* Swap deck: solid swap cards in a flingable stack, then "This week's swap".
+   Tokens only (core.css). The stack is a one-cell grid, so it is as tall as its tallest card
+   and nothing clips at 200% text. */
+.dk-deck { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); container-type: inline-size; }
+
+.dk-stack { display: grid; grid-template-columns: minmax(0, 1fr); padding-bottom: var(--s-6); }
+.dk-card { grid-area: 1 / 1; min-width: 0; position: relative; min-height: 15rem; display: flex; flex-direction: column; gap: var(--s-2);
+  padding: var(--s-5); border-radius: var(--r-card); background: var(--surface); box-shadow: var(--shadow-card);
+  transform-origin: 50% 50%; touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: grab; will-change: transform; }
+.dk-card.dragging { cursor: grabbing; box-shadow: var(--shadow-float); }
+.dk-card.gone { pointer-events: none; box-shadow: var(--shadow-float); }
+.dk-card:not(.top):not(.gone) { pointer-events: none; }
+/* Cards waiting behind show only their edge. */
+.dk-card > * { transition: opacity var(--fade) linear; }
+.dk-card:not(.top):not(.gone) > * { opacity: 0; }
+.dk-card:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: var(--r-card); }
+
+.dk-top { display: flex; align-items: center; gap: var(--s-2); margin-bottom: var(--s-2); }
+.dk-top .brandmark { margin-right: var(--s-1); }
+.dk-now { display: none; font-weight: 600; color: var(--accent-ink); background: var(--accent-soft); border-radius: var(--r-pill); padding: 2px var(--s-2); }
+.dk-card.is-pick .dk-now { display: inline-flex; }
+.dk-t { margin: 0; text-wrap: balance; overflow-wrap: anywhere; }
+.dk-detail { margin: 0; }
+.dk-amt { margin: auto 0 0; padding-top: var(--s-3); display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--s-2); row-gap: var(--s-1); }
+.dk-amt .n-l { color: var(--ink); }
+.dk-basis { margin: 0; padding-top: var(--s-3); box-shadow: 0 -.5px 0 var(--hair); }
+
+/* Stamps follow the drag. Physical, tilted, no glow. */
+.dk-stamp { position: absolute; top: var(--s-5); z-index: 2; max-width: 9rem; padding: var(--s-1) var(--s-3); border-radius: var(--r-well);
+  font-size: 1rem; line-height: 1.2; font-weight: 700; text-align: center; border: 2px solid currentColor; background: var(--surface);
+  opacity: 0; pointer-events: none; }
+.dk-stamp.yes { left: var(--s-4); color: var(--accent-ink); rotate: -8deg; }
+.dk-stamp.no { right: var(--s-4); color: var(--ink-2); rotate: 8deg; }
+.dk-card:not(.top):not(.gone) .dk-stamp { opacity: 0 !important; }
+
+/* Floating controls: the only glass in this feature. */
+.dk-actions { display: flex; justify-content: center; align-items: flex-start; gap: var(--s-6); }
+.dk-act { display: grid; justify-items: center; gap: var(--s-1); min-width: var(--tap); max-width: 45%; color: var(--ink); }
+.dk-btn { width: 3.5rem; height: 3.5rem; min-width: var(--tap); min-height: var(--tap); border-radius: var(--r-pill); display: grid; place-items: center; }
+.dk-act.yes .dk-btn { color: var(--accent-ink); }
+.dk-lbl { font-weight: 600; color: var(--ink-2); text-align: center; }
+.dk-act:focus-visible { outline: none; }
+.dk-act:focus-visible .dk-btn { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+.dk-end { display: grid; gap: var(--s-2); padding: var(--s-5); }
+.dk-end h2 { margin: 0; }
+.dk-end.in-stack { grid-area: 1 / 1; align-self: start; position: relative; z-index: 1; }
+.dk-actions[hidden] { display: none; }
+.dk .section-title { align-items: center; justify-content: flex-start; }
+.dk-end p { margin: 0 0 var(--s-2); }
+
+/* This week's swap */
+.dk .section-title { margin-top: var(--s-6); }
+.dk-pick { padding: var(--s-4); }
+.dk-pick-row { display: flex; align-items: center; gap: var(--s-3); }
+.dk-pick-row .grow { flex: 1; min-width: 0; }
+.dk-pick-t, .dk-pick-a, .dk-pick-note, .dk-empty { margin: 0; overflow-wrap: anywhere; }
+.dk-pick-note { margin-top: var(--s-3); padding-top: var(--s-3); box-shadow: 0 -.5px 0 var(--hair); }
+
+@media (prefers-reduced-motion: reduce) {
+  .dk-card { will-change: auto; }
+}

@@ -1,0 +1,73 @@
+/* Move-in mode: Week tab row, question steps, "What changed" chart and swaps. Tokens only. */
+.mi-banner { width: 100%; display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: var(--s-3); align-items: center; text-align: left; margin-top: var(--s-6); }
+.mi-ico { width: 40px; height: 40px; border-radius: var(--r-well); display: grid; place-items: center; background: var(--fill-2); color: var(--ink); }
+.mi-text { display: grid; gap: 2px; min-width: 0; }
+.mi-go { color: var(--ink-3); display: grid; place-items: center; }
+
+/* Sheet flow */
+.mi-stage { display: flex; flex-direction: column; overflow-x: clip; }
+.mi-step { display: flex; flex-direction: column; }
+.mi-step h2 { margin: 0 0 var(--s-1); text-wrap: balance; }
+.mi-count { margin: var(--s-2) 0 var(--s-1); }
+.mi-res h2 { margin-top: var(--s-2); }
+.mi-hint { margin: 0 0 var(--s-4); }
+.mi-opts { margin-top: 0; }
+.mi-opts .choice { min-height: 56px; }
+.mi-opts .choice .tick { box-shadow: inset 0 0 0 1.5px var(--ink-3); }
+.mi-opts .choice[aria-checked="true"] { box-shadow: var(--shadow-card), inset 0 0 0 2px var(--ink); }
+.mi-opts .choice[aria-checked="true"] .tick { box-shadow: none; }
+
+/* Chart card */
+.mi-chartcard { display: grid; gap: var(--s-2); }
+.mi-chart-head { display: flex; justify-content: space-between; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.mi-chartwrap { width: 100%; }
+.mi-chart { display: block; width: 100%; height: auto; overflow: visible; font-family: var(--sys); font-variant-numeric: tabular-nums; }
+.mi-chart .gl { stroke: var(--hair); stroke-width: 1; }
+.mi-chart .gl.zero, .mi-chart .tk { stroke: var(--ink-4); }
+.mi-chart .yl, .mi-chart .xl { fill: var(--ink-3); font-weight: 500; }
+.mi-chart .bars { transform-box: view-box; }
+.mi-chart .b.move { fill: var(--move); }
+.mi-chart .b.food { fill: var(--food); }
+.mi-chart .mk line { stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 3 3; }
+.mi-chart .mk text { fill: var(--ink); }
+.mi-chart .avg path { stroke: var(--ink); stroke-width: 1.8; stroke-dasharray: 5 3; fill: none; }
+.mi-chart .avg text { fill: var(--ink); paint-order: stroke; stroke: var(--surface); stroke-width: 3.5px; stroke-linejoin: round; }
+.mi-legend { display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-3); }
+.mi-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.mi-dash { width: 14px; height: 0; border-top: 2px dashed var(--ink); }
+.mi-mk { width: 0; height: 12px; border-left: 1.5px dashed var(--ink); }
+.mi-cap { margin: 0; }
+.mi-data summary { cursor: pointer; color: var(--ink-2); font-weight: 600; min-height: var(--tap); display: flex; align-items: center; }
+.mi-data table { width: 100%; border-collapse: collapse; }
+.mi-data th { text-align: left; font-weight: 600; color: var(--ink-2); padding: var(--s-1) 0; }
+.mi-data th + th, .mi-data td + td { text-align: right; }
+.mi-data td { padding: 3px 0; box-shadow: 0 -.5px 0 var(--hair); }
+
+.mi-avgs { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); margin-top: var(--s-3); }
+.mi-avgs > div { display: grid; gap: var(--s-1); }
+
+/* Swaps */
+.mi-res .section-title { margin-top: var(--s-6); }
+.mi-sugs { display: grid; gap: var(--s-3); }
+.mi-sug { display: grid; gap: var(--s-3); }
+.mi-sug-top { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: var(--s-3); align-items: start; }
+.mi-sug-top b { display: block; }
+.mi-sug-top p { margin: 2px 0 0; }
+.mi-gaps { display: grid; gap: 6px; }
+.mi-gaps-head { display: flex; justify-content: space-between; align-items: center; font-weight: 600; color: var(--ink-2); }
+.mi-gap { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto auto; gap: var(--s-2) var(--s-3); color: var(--ink-2); align-items: center; }
+.mi-gap .brandmark { border-radius: 5px; }
+.mi-gap > span:nth-child(2) { color: var(--ink); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mi-gap b { color: var(--ink); }
+.mi-gap > span:nth-child(n+3) { text-align: right; min-width: 3.5rem; }
+.mi-gap-cols > span:nth-child(2) { visibility: hidden; }
+.mi-gap-cols { color: var(--ink-3); font-weight: 600; }
+.mi-save { display: grid; gap: 2px; }
+.mi-add svg { display: none; }
+.mi-add[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+.mi-add[aria-pressed="true"] svg { display: block; }
+
+.mi-protect { display: flex; gap: var(--s-2); align-items: flex-start; margin: var(--s-4) var(--s-1) 0; }
+.mi-protect svg { flex: none; margin-top: 1px; color: var(--night-ink); }
+
+.mi-gap-s { height: var(--s-4); }

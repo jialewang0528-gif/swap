@@ -1,0 +1,20 @@
+/* Where your money goes. Tokens only. */
+.mo { display: grid; gap: var(--s-3); }
+.mo-head { display: flex; justify-content: space-between; align-items: flex-end; gap: var(--s-3); }
+.mo-head > div { display: grid; gap: 2px; }
+.mo-big { font-size: 2.353rem; font-weight: 700; line-height: 1.05; }
+.mo-in { text-align: right; }
+.mo-in b { font-size: 1.176rem; font-weight: 700; color: var(--accent-ink); }
+.mo-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.mo-cat { display: grid; grid-template-columns: 14px minmax(0, 1.3fr) minmax(0, 1fr) auto; align-items: center; gap: var(--s-2); min-height: 48px; }
+.mo-cat + .mo-cat { box-shadow: 0 -.5px 0 var(--hair); }
+.mo-name { display: grid; min-width: 0; overflow-wrap: anywhere; }
+.mo-track { height: 8px; border-radius: var(--r-pill); background: var(--fill); overflow: hidden; }
+.mo-track i { display: block; height: 100%; border-radius: inherit; background: var(--ink-4); }
+.mo-track i.food { background: var(--food); }
+.mo-track i.move { background: var(--move); }
+.mo-amt { font-weight: 600; text-align: right; white-space: nowrap; }
+.mo-rest, .mo-fine { margin: 0; }
+.mo-h { margin: var(--s-1) 0 0; font-weight: 600; color: var(--ink-2); }
+.mo .grow { display: grid; }
+.mo-place { overflow-wrap: anywhere; }

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>swap.morning</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>__ROOT__/scripts/morning.sh</string>
+  </array>
+  <!-- Every day at 7:30 am; if the Mac is asleep then, it runs when it wakes. -->
+  <key>StartCalendarInterval</key>
+  <dict><key>Hour</key><integer>7</integer><key>Minute</key><integer>30</integer></dict>
+  <key>StandardOutPath</key><string>__ROOT__/data/launchd.out</string>
+  <key>StandardErrorPath</key><string>__ROOT__/data/launchd.err</string>
+</dict>
+</plist>

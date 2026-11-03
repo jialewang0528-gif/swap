@@ -1,0 +1,158 @@
+/* Ask Swap: texting inside the app. Solid white bubbles for Swap, ink bubbles for you, solid
+   answer cards, and one glass element: the composer dock.
+   Geometry: the view pads the bottom by (--bottom + 110px); the tab bar's top edge sits at
+   (--bottom + 60px). The dock rests 10px above the tab bar (40px inside that padding), so it is
+   sticky at bottom: -40px. With the keyboard up (.app.kb, tab bar hidden) it rests 8px above
+   the keyboard instead. Tokens only. */
+#slot-agent { display: flex; flex-direction: column; min-height: calc(100% - 64px + 40px); margin-bottom: -40px; }
+#view-chat { scroll-padding-bottom: calc(var(--bottom) + 190px); }
+.ag { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+.ag-note { margin: -8px 4px 0; display: flex; align-items: center; gap: var(--s-2); }
+.ag-note .sample { vertical-align: 0; }
+.ag-stamp { text-align: center; margin: var(--s-5) 0 var(--s-3); }
+
+/* ---------- Conversation ---------- */
+.ag-log { flex: 1; display: flex; flex-direction: column; gap: var(--s-4); padding-bottom: var(--s-4); }
+.ag-turn { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ag-turn.bot { align-items: flex-start; }
+.ag-turn.me { align-items: flex-end; }
+
+.ag-b { max-width: 82%; padding: 9px 14px; border-radius: 20px; overflow-wrap: anywhere; }
+.ag-b.bot { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-card); }
+.ag-b.bot + .ag-b.bot { border-top-left-radius: 6px; }
+.ag-b.bot:has(+ .ag-b.bot) { border-bottom-left-radius: 6px; }
+.ag-b.me { background: var(--ink); color: var(--surface); border-bottom-right-radius: 6px; }
+.ag-b b.num { font-weight: 700; }
+
+/* Typing dots: a CSS loop that dies with its node. Static under reduced motion. */
+.ag-typing { display: inline-flex; gap: 5px; align-items: center; height: 38px; padding: 0 16px; }
+.ag-typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3); opacity: .35; animation: ag-dot 1s ease-in-out infinite; }
+.ag-typing i:nth-child(2) { animation-delay: .15s; }
+.ag-typing i:nth-child(3) { animation-delay: .3s; }
+@keyframes ag-dot { 40% { opacity: 1; translate: 0 -2px; } }
+@media (prefers-reduced-motion: reduce) { .ag-typing i { animation: none; opacity: .6; } }
+
+/* ---------- Answer cards (solid) ---------- */
+.ag-turn > .ag-card, .ag-turn > .ag-actions { margin-top: var(--s-2); }
+.ag-card { align-self: stretch; min-width: 0; }
+.ag-card-h { display: flex; justify-content: space-between; align-items: center; gap: var(--s-2); margin-bottom: var(--s-3); }
+.ag-kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr)); gap: var(--s-2); margin-bottom: var(--s-3); }
+.ag-kv > div { display: grid; gap: 2px; min-width: 0; }
+/* Three across when they fit; at large text they wrap instead of colliding. */
+.ag-kv b { font-size: 1.294rem; line-height: 1.1; font-weight: 700; }
+.ag-legend { display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-4); margin-top: var(--s-3); }
+.ag-legend > span { display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.ag-fine { margin: var(--s-2) 0 0; }
+.ag-ell { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Meters and bars: one fill wrapper per bar (one node to animate), the cap as a tick. */
+.ag-meter, .ag-bar { position: relative; height: 12px; border-radius: var(--r-pill); background: var(--fill-2); }
+.ag-bar.thin { height: 8px; }
+.ag-meter-fill { position: absolute; inset: 0; display: flex; gap: 2px; border-radius: inherit; overflow: hidden; transform-origin: left; }
+.ag-meter-fill i { display: block; height: 100%; flex: none; }
+.ag-extra, .ag-dot-extra { background: repeating-linear-gradient(135deg, var(--ink-3) 0 2px, var(--fill-2) 2px 5px); }
+.ag-cap { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--ink); }
+.ag-tick { display: inline-block; width: 2px; height: 12px; border-radius: 1px; background: var(--ink); }
+.ag-wrow + .ag-wrow, .ag-crow + .ag-crow { margin-top: var(--s-3); }
+.ag-wtop { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-2); margin-bottom: 6px; }
+.ag-wtop > span:first-child { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.ag-wtop b { font-weight: 700; }
+
+/* Trip timeline */
+.ag-trow { display: grid; grid-template-columns: 32px minmax(0, 76px) minmax(0, 1fr) auto; gap: var(--s-2); align-items: center; min-height: var(--tap); }
+.ag-tn { display: grid; line-height: 1.2; min-width: 0; }
+.ag-tn > * { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ag-tl { position: relative; height: 8px; border-radius: var(--r-pill); background: var(--fill-2); }
+.ag-tl i { position: absolute; top: 0; bottom: 0; border-radius: var(--r-pill); }
+.ag-trow .amt { font-family: var(--round); font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; }
+
+/* Weekly spark with the move marked */
+.ag-spark { position: relative; height: 80px; }
+.ag-bars { position: absolute; inset: 0; display: flex; align-items: flex-end; gap: 1.5px; }
+.ag-bars i { flex: 1; min-width: 0; border-radius: 2px 2px 1px 1px; background: var(--fill-2); }
+.ag-bars i.fill-move { background: var(--move); }
+.ag-bars i.fill-food { background: var(--food); }
+.ag-mark { position: absolute; top: -4px; bottom: -4px; width: 0; border-left: 1.5px dashed var(--ink-3); }
+.ag-axis { position: relative; display: flex; justify-content: space-between; margin-top: 6px; height: 14px; }
+.ag-axis .m { position: absolute; top: 0; translate: -50% 0; white-space: nowrap; color: var(--ink); }
+
+/* Swap, night ride */
+.ag-swap, .ag-night { display: flex; align-items: center; gap: var(--s-3); }
+.ag-swap { align-items: flex-start; }
+.ag-swap .grow, .ag-night .grow { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.ag-save { display: grid; justify-items: end; text-align: right; }
+.ag-save b { font-size: 1.294rem; font-weight: 700; }
+.ag-protect { display: inline-flex; align-items: center; gap: 4px; min-height: 28px; padding: 0 10px; border-radius: var(--r-pill); background: var(--night-soft); color: var(--night-ink); font-weight: 600; flex: none; }
+.ag-night.undone { opacity: .55; }
+.ag-night.undone .ag-protect { visibility: hidden; }
+
+/* Venmo-style request */
+.ag-req .row .amt, .ag-each { font-family: var(--round); font-variant-numeric: tabular-nums; font-weight: 700; }
+.ag-each { font-size: 1.294rem; }
+.ag-seg { display: inline-flex; gap: 6px; }
+.ag-seg .chip { min-width: 44px; justify-content: center; padding: 0 12px; }
+.ag-req .ag-actions { margin-top: var(--s-2); }
+
+/* Actions and the fallback list */
+.ag-actions { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.ag-actions .btn.accent[aria-disabled="true"] { cursor: default; opacity: 1; }
+.ag-suggest .list { padding: 0 var(--s-4); }
+.ag-sugg { width: 100%; text-align: left; justify-content: space-between; min-height: var(--s-11); }
+.ag-sugg svg { color: var(--ink-3); flex: none; }
+.ag-sugg:focus-visible { outline-offset: -2px; }
+
+/* ---------- Dock: chips + composer (the only glass) ---------- */
+.ag-dock { position: sticky; bottom: -40px; z-index: 3; display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: var(--s-2); padding-top: var(--s-2); isolation: isolate; }
+.app.kb .ag-dock { bottom: calc(var(--kb, 0px) - var(--bottom) - 110px + 8px); }
+/* Content fades under the dock. Plain gradient: no blur, nothing repaints per frame. */
+.ag-dock::before { content: ""; position: absolute; z-index: -1; left: calc(-1 * var(--gutter)); right: calc(-1 * var(--gutter)); top: -20px; bottom: -40px;
+  background: linear-gradient(to bottom, transparent, var(--canvas) 26px); pointer-events: none; }
+.ag-chips { display: flex; gap: var(--s-2); overflow-x: auto; margin: 0 calc(-1 * var(--gutter)); padding: 6px var(--gutter); scrollbar-width: none; overscroll-behavior-x: contain;
+  -webkit-mask-image: linear-gradient(to right, transparent, var(--ink) var(--gutter), var(--ink) calc(100% - 28px), transparent); mask-image: linear-gradient(to right, transparent, var(--ink) var(--gutter), var(--ink) calc(100% - 28px), transparent); }
+.ag-chips::-webkit-scrollbar { display: none; }
+.ag-chip { flex: none; white-space: nowrap; }
+.ag-chip:focus-visible { outline-offset: -2px; }
+
+.ag-chips, .ag-composer { min-width: 0; max-width: 100%; }
+.ag-composer { display: flex; align-items: center; gap: var(--s-2); min-height: 52px; padding: 4px 6px 4px 18px; border-radius: var(--r-pill); }
+.ag-composer input { flex: 1; min-width: 0; height: 44px; border: 0; outline: 0; background: none; padding: 0; color: var(--ink); }
+.ag-composer input::placeholder { color: var(--ink-3); }
+.ag-composer:focus-within { box-shadow: var(--shadow-float), inset 0 1px 0 var(--glass-edge), 0 0 0 2px var(--ink); }
+.ag-send { width: 40px; height: 40px; border-radius: 50%; flex: none; display: grid; place-items: center; background: var(--ink); color: var(--surface); position: relative;
+  transition: scale var(--dur-snappy) var(--ease-snappy), background var(--fade), color var(--fade); }
+.ag-send::after { content: ""; position: absolute; inset: -2px; }
+.ag-send:disabled { background: var(--fill-2); color: var(--ink-3); cursor: default; }
+.ag-send:not(:disabled):active { scale: .9; }
+.ag-send:focus-visible { outline-offset: 2px; border-radius: 50%; }
+
+@media (prefers-contrast: more), (prefers-reduced-transparency: reduce) {
+  .ag-b.bot { box-shadow: inset 0 0 0 1px var(--hair); }
+}
+
+/* Brand marks in answer cards: same footprint as the category wells. */
+.ag-brand { display: inline-flex; align-items: center; gap: var(--s-2); min-width: 0; }
+.ag-card .list .row { gap: var(--s-3); }
+.ag-req .row .brandmark { margin-right: calc(-1 * var(--s-1)); }
+
+/* Round 2: card titles are h3 (rotor-navigable), no extra margins. */
+.ag-card h3 { margin: 0; }
+.ag-card-h-end { justify-content: flex-end; margin-bottom: var(--s-2); }
+/* Opening: starter questions sit right under the first line, full width. */
+.ag-turn.bot > .ag-suggest { margin-top: var(--s-2); }
+/* No sideways scroll at 200% text or 320px: everything in the chat can shrink and wrap. */
+.ag, .ag-log, .ag-turn, .ag-card, .ag-actions { min-width: 0; max-width: 100%; }
+.ag-actions { flex-wrap: wrap; }
+.ag-b { overflow-wrap: anywhere; }
+.ag-wtop, .ag-card-h { flex-wrap: wrap; min-width: 0; }
+.ag-legend { flex-wrap: wrap; }
+.ag-trow, .ag-swap { min-width: 0; }
+
+/* Daily plan card: day, spent (fill) vs plan (tick), amount. Today in bold. */
+.ag-prow { display: grid; grid-template-columns: 3.4rem minmax(0, 1fr) auto; gap: var(--s-2) var(--s-3); align-items: center; min-height: 30px; }
+.ag-prow + .ag-prow { margin-top: 2px; }
+.ag-prow.on .ag-pday, .ag-prow.on .ag-pamt { font-weight: 700; color: var(--ink); }
+.ag-prow.past .ag-pday { color: var(--ink-2); }
+.ag-pamt { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ag-pspent, .ag-dot-spent { background: var(--accent); }
+.ag-pspent.over { background: var(--food); }

@@ -65,7 +65,10 @@ class ClassifyTest(unittest.TestCase):
         self.assertEqual(pull.classify(txn("9", "Trader Joe's", category="FOOD_AND_DRINK_GROCERIES")), "groceries")
         self.assertEqual(pull.classify(txn("10", "MTA*NYCT PAYGO", category="TRANSPORTATION_PUBLIC_TRANSIT")), "transit")
         self.assertEqual(pull.classify(txn("16", "Cava", category="FOOD_AND_DRINK_RESTAURANT")), "dining")
-        self.assertEqual(pull.classify(txn("17", "Corner Bar", category="FOOD_AND_DRINK_BEER_WINE_AND_LIQUOR")), "dining")
+        self.assertEqual(pull.classify(txn("17", "Corner Bar", category="FOOD_AND_DRINK_BEER_WINE_AND_LIQUOR")), "drinks")
+        self.assertEqual(pull.classify(txn("22", "POS DEBIT CORNER MINI MARKET AND D", category="GENERAL_MERCHANDISE_CONVENIENCE_STORES")), "drinks")
+        self.assertEqual(pull.classify(txn("23", "POS DEBIT MAIN ST. WINE", category="GENERAL_MERCHANDISE_OTHER_GENERAL_MERCHANDISE")), "drinks")
+        self.assertEqual(pull.classify(txn("24", "POS DEBIT RIDEAPP* HOLDFORDRIVER +1831", merchant="Lower-fare app", category="LOAN_PAYMENTS_CASH_ADVANCES")), "ride")
 
     def test_intercity_trains_dropped(self):
         self.assertIsNone(pull.classify(txn("21", "Amtrak", merchant="Amtrak", category="TRANSPORTATION_PUBLIC_TRANSIT")))

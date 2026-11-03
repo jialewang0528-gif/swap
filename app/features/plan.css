@@ -1,0 +1,12 @@
+/* Swaps to hit the goal. Tokens only. */
+.pl { display: grid; gap: var(--s-3); }
+.pl-head { display: flex; justify-content: space-between; align-items: flex-end; gap: var(--s-3); }
+.pl-head > div { display: grid; gap: 2px; }
+.pl-big { font-size: 2.353rem; font-weight: 700; line-height: 1.05; }
+.pl-sum { text-align: right; }
+.pl-sum b { font-size: 1.176rem; font-weight: 700; color: var(--accent-ink); }
+.pl .grow, .pl-all .grow { display: grid; }
+.pl-t { overflow-wrap: anywhere; }
+.pl-short { margin: 0; color: var(--food-ink); }
+.pl-fine { margin: 0; }
+.pl-all { padding: var(--s-1) var(--s-4); }
