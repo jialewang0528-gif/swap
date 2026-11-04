@@ -172,7 +172,7 @@
   // ---------- Profiles ----------
   const ORDER = D0.order || Object.keys(D0.profiles);
   const qp = new URLSearchParams(location.search).get("profile");
-  let active = (qp && D0.profiles[qp]) ? qp : (D0.profiles[state.profile] ? state.profile : "you");
+  let active = (qp && D0.profiles[qp]) ? qp : (D0.profiles[state.profile] ? state.profile : D0.active);
   D0.active = active;
   function activeId() { return active; }
   // The four living questions. One list, one order, used by onboarding, the You sheet and Move-in.
@@ -985,9 +985,9 @@
     }
     // Fine print: live "you" is real card data, so no prototype or sample wording about it.
     const fine = document.querySelector("[data-fine]"), you = D0.profiles.you;
-    if (fine) fine.textContent = you.live
+    if (fine) fine.textContent = you && you.live
       ? `You: your bank data, ${you.blurb.replace(/^Your bank, s/, "s")}. Meal plan and Weekend are sample students.`
-      : "Prototype. You: real card history, sample week. Meal plan and Weekend: sample students.";
+      : "Prototype. Meal plan and Weekend are sample students.";
     const tabIndex = id => TABS.findIndex(t => t.id === id);
     features.slice().sort((a, b) => (tabIndex(a.tab) - tabIndex(b.tab)) || ((a.order || 0) - (b.order || 0))).forEach(f => {
       const li = el(`<li><button data-id="${f.id}" aria-current="false"><strong>${esc(f.title)}</strong><span>${esc(f.pitch || "")}</span></button></li>`);

@@ -119,8 +119,8 @@ Owner of `core.css`, `core.js`, `data.js`, `index.html`. Feature authors build o
 
 ## Profile data (data.js)
 - **"you" with private/live.js (founder's phone):** everything is real (`live: true`), the week is the last full week, no owed amount (cap = usual − save), `rideAppName`, `recommendRideApp` (adds the "rideapp-rides" swap first), `syncedAt`, blurb "Your card, synced Nov 3, 12:47 AM".
-- **"you" without it (public site):** founder profile with sample values. This week and the swaps are SAMPLE.
-- **"mealplan" and "social":** all SAMPLE, with generic merchants. Their usual, this week, cap, subway taps and move averages are derived at load from the rows and charges, so they can't drift. The real profile is checked and warns in the console if it drifts.
+- **No "you" without live data:** the public site has no "you" profile and opens on "social" (`?profile=` still picks). Base numbers the sync doesn't produce (move, DashPass, swaps) come from `private/founder.js` (gitignored; see `founder.example.js`). No real numbers in tracked files.
+- **"mealplan" and "social":** all SAMPLE, with generic merchants. Their usual, this week, cap, subway taps and move averages are derived at load from the rows and charges, so they can't drift.
 - **Formulas:**
   - usual = mean of the last 6 weekly rows (the last row is this week)
   - this week = sum of the charges

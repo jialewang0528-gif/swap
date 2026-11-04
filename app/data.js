@@ -1,10 +1,9 @@
-/* Swap prototype data: three profiles that share one shape.
-   - you      = the founder's profile. Sample values (real numbers removed from history). This week's
-                charges and the swaps are a SAMPLE week built on the real numbers; see `real`.
+/* Swap prototype data: profiles that share one shape.
+   - you      = the viewer's own bank (live data only; see below). Never on the public site.
    - mealplan = SAMPLE dorm student on a meal plan. Illustrative; chain names are examples.
-   - social   = SAMPLE weekend social spender. Illustrative; chain names are examples.
+   - social   = SAMPLE weekend social spender. Illustrative; chain names are examples. The public default.
 
-   Every profile has the same fields, so features read api.data the same way for all three:
+   Every profile has the same fields, so features read api.data the same way for all of them:
      id, label, short, source ("real" | "sample"), blurb, real (fields that are REAL data),
      facts { hasMealPlan, kitchen, subwayMinutes, lateNights, moved },
      today, weekLabel, nightWindow, tags,
@@ -16,7 +15,7 @@
      move, ridePrices, subway, priceGaps, memberships, mealPlan (null if none), charges, swaps.
 
    For the sample profiles, the derived numbers are computed below from the rows and charges, so
-   they can't drift. For `you`, the real numbers are written out and checked (console warning on drift).
+   they can't drift. For `you`, they come from the live data.
    Kinds: food = dining + drinks + quick + delivery; move ("getting around") = ride + transit.
    Night rides (11 PM to 6 AM, or tagged "night") are counted and never a swap target. */
 (function () {
@@ -28,93 +27,33 @@
     tags: { food: ["planned", "tired", "late", "friends", "treat"], move: ["class", "late", "out", "night", "errand"] }
   };
 
-  // ---------------- you: founder profile (sample values) ----------------
-  const you = {
-    id: "you", label: "You", short: "You", source: "real",
-    blurb: "Sample values.",
-    // Fields that are REAL. Everything else in this profile is SAMPLE and must be labeled.
-    real: ["usual", "weekly", "move", "ridePrices", "priceGaps", "memberships", "subway"],
-    // SAMPLE defaults until the student answers Move-in (store "moveProfile" overrides these).
-    facts: { hasMealPlan: false, kitchen: "none", subwayMinutes: 30, lateNights: 2, moved: true },
-
-    // Usual week (sample values).
-    // Airport rides over $60 are excluded everywhere.
-    // Food counts card charges at full price; friends' paybacks are not netted here.
-    usual: { food: 300, move: 90, total: 390 },
-
-    // SAMPLE: this week with Swap.
-    thisWeek: { food: 366, move: 148, total: 514, cap: 520, saveTarget: 100, payback: { owed: 20, perWeek: 10, weeksLeft: 2 }, paidBack: 0 },
-
-    // Weekly totals (USD) by kind, Mon-start weeks (sample values).
-    weekly: [{"wk":"2026-08-24","ride":71,"delivery":0,"dining":248,"quick":38,"transit":15},{"wk":"2026-08-31","ride":88,"delivery":23,"dining":301,"quick":44,"transit":12},{"wk":"2026-09-07","ride":64,"delivery":0,"dining":276,"quick":36,"transit":15},{"wk":"2026-09-14","ride":95,"delivery":19,"dining":322,"quick":41,"transit":12},{"wk":"2026-09-21","ride":82,"delivery":0,"dining":288,"quick":47,"transit":15},{"wk":"2026-09-28","ride":104,"delivery":26,"dining":341,"quick":39,"transit":12},{"wk":"2026-10-05","ride":76,"delivery":0,"dining":265,"quick":44,"transit":15},{"wk":"2026-10-12","ride":118,"delivery":21,"dining":356,"quick":38,"transit":9},{"wk":"2026-10-19","ride":89,"delivery":0,"dining":302,"quick":43,"transit":12}],
-
-    // Move (sample values).
-    // "Before" and "After" exclude airport rides.
-    move: { date: "2026-08-24", beforeLabel: "Last fall", afterLabel: "Since the move", ridesPerWeekBefore: 1, ridesPerWeekAfter: 5, rideSpendBefore: 15, rideSpendAfter: 75 },
-
-    // Median ride price by app (sample values). The lower-fare app is never suggested on public profiles.
-    ridePrices: [ { app: "Lower-fare app", median: 15.00 }, { app: "Lyft", median: 17.20 }, { app: "Uber", median: 19.40 } ],
-    subway: { fare: 3, weeklyCap: 35, tapsPerWeek: 3, perWeek: 9 },
-
-    // Same chain, in person vs delivered (sample values).
-    priceGaps: [ { place: "Shake Shack", pickup: 15, delivered: 26 }, { place: "Domino's", pickup: 13, delivered: 24 }, { place: "Thai place", pickup: 17, delivered: 29 } ],
-
-    // DashPass (sample values).
-    memberships: [ { name: "DashPass", price: 9.99, period: "month", ordersPerWeek: 1, student: 4.99 } ],
-    mealPlan: null,
-
-    // SAMPLE: this week's charges. time = "HH:MM" or null when the bank sent no time.
-    // day 0 = Monday ... 6 = Sunday. Ids are stable (saved tags are keyed by id).
-    charges: [
-      { id: "c1", day: 0, time: "08:42", merchant: "Lower-fare app", amount: 14, kind: "ride", tag: "class" },
-      { id: "c2", day: 0, time: null, merchant: "Cava", amount: 16, kind: "dining", tag: "planned" },
-      { id: "c3", day: 0, time: null, merchant: "Blank Street", amount: 7, kind: "quick", tag: null },
-      { id: "c4", day: 1, time: "09:05", merchant: "Lower-fare app", amount: 15, kind: "ride", tag: "late" },
-      { id: "c5", day: 1, time: null, merchant: "Cava", amount: 16, kind: "dining", tag: "planned" },
-      { id: "c6", day: 1, time: null, merchant: "MTA", amount: 3, kind: "transit", tag: null },
-      { id: "c7", day: 2, time: null, merchant: "MTA", amount: 3, kind: "transit", tag: null },
-      { id: "c8", day: 2, time: "23:48", merchant: "Lyft", amount: 22, kind: "ride", tag: "night" },
-      { id: "c9", day: 2, time: null, merchant: "DoorDash · Thai", amount: 34, kind: "delivery", tag: "tired" },
-      { id: "c10", day: 3, time: "08:51", merchant: "Lower-fare app", amount: 16, kind: "ride", tag: "class" },
-      { id: "c11", day: 3, time: null, merchant: "Joe & The Juice", amount: 12, kind: "quick", tag: null },
-      { id: "c12", day: 4, time: null, merchant: "Thai restaurant", amount: 58, kind: "dining", tag: "friends" },
-      { id: "c13", day: 4, time: "20:10", merchant: "Uber", amount: 18, kind: "ride", tag: "out" },
-      { id: "c14", day: 5, time: null, merchant: "Bar tab", amount: 84, kind: "dining", tag: "friends" },
-      { id: "c15", day: 5, time: "01:12", merchant: "Lower-fare app", amount: 21, kind: "ride", tag: "night" },
-      { id: "c16", day: 5, time: null, merchant: "Coffee shop", amount: 9, kind: "quick", tag: "treat" },
-      { id: "c17", day: 6, time: null, merchant: "Hot pot", amount: 46, kind: "dining", tag: "friends" },
-      { id: "c18", day: 6, time: null, merchant: "Sushi place", amount: 31, kind: "dining", tag: "planned" },
-      { id: "c19", day: 6, time: "13:30", merchant: "Lower-fare app", amount: 8, kind: "ride", tag: "errand" },
-      { id: "c20", day: 6, time: null, merchant: "MTA", amount: 3, kind: "transit", tag: null },
-      { id: "c21", day: 1, time: null, merchant: "Shake Shack", amount: 22, kind: "dining", tag: "tired" },
-      { id: "c22", day: 3, time: null, merchant: "Sweetgreen", amount: 18, kind: "dining", tag: null },
-      { id: "c23", day: 4, time: null, merchant: "Starbucks", amount: 8, kind: "quick", tag: null },
-      { id: "c24", day: 4, time: "08:40", merchant: "Lower-fare app", amount: 15, kind: "ride", tag: "class" },
-      { id: "c25", day: 2, time: null, merchant: "Lower-fare app", amount: 10, kind: "ride", tag: null }
-    ],
-
-    // SAMPLE swaps.
-    // needs: facts that must hold (see api.swaps()): "mealPlan", "noMealPlan", "kitchen", "noKitchen", "subway".
-    swaps: [
-      { id: "subway-am", title: "Subway Tue + Thu mornings", detail: "Leave 15 min earlier on class days.", save: 24, unit: "week", kind: "move", basis: "2 rides at ~$15 → 2 fares at $3", needs: ["subway"] },
-      { id: "pickup-chipotle", title: "Pick up Shake Shack", detail: "Same order, you walk 6 min.", save: 11, unit: "order", kind: "food", basis: "Delivered $26 vs pickup $15" },
-      { id: "swipe-lunch", title: "Friend's dining hall swipe", detail: "Lunch on the 2 days you're near campus.", save: 18, unit: "meal", kind: "food", basis: "Sit-down lunch ~$18 vs a guest swipe", needs: ["noMealPlan"] },
-      { id: "split-ride", title: "Split the ride to dinner", detail: "Same direction as friends. Opt in only. Night rides home stay as they are.", save: 9, unit: "ride", kind: "move", basis: "$18 ride at 8 pm split two ways" },
-      { id: "dashpass-student", title: "DashPass → student plan", detail: "Same perks at $4.99 once you verify student status.", save: 5, unit: "month", kind: "food", basis: "$9.99 vs $4.99 student price" },
-      { id: "coffee-home", title: "Make coffee 3 mornings", detail: "Cold brew from the fridge. Keep the coffee shop for Fridays.", save: 18, unit: "week", kind: "food", basis: "3 × ~$7 drinks vs ~$1 each" }
-    ]
-  };
-
-  // ---------------- you: live data from sync.py (private/live.js), when present ----------------
-  // On the founder's phone build, every number in "You" is real: last full week, charges, history.
+  // ---------------- you: the viewer's own bank, only when there is one ----------------
+  // "you" exists only with live data: private/live.js (the founder's phone build) or a signed-up
+  // person's data from cloud.js. The public site has no "you" and opens on a sample student.
+  // No real numbers are written in this file. The founder's own base numbers (move date, DashPass,
+  // sample week and swaps) are in private/founder.js (gitignored) as window.SwapFounder.
   const L = window.SwapLive;
+  const you = L ? Object.assign({
+    id: "you", label: "You", short: "You", source: "real", blurb: "Your bank.",
+    real: [],
+    // Defaults until the person answers Move-in (store "moveProfile" overrides these).
+    facts: { hasMealPlan: false, kitchen: "none", subwayMinutes: 30, lateNights: 2, moved: false },
+    thisWeek: { saveTarget: 50, payback: { owed: 0, perWeek: 0, weeksLeft: 0 }, paidBack: 0 },
+    weekly: [],
+    move: { date: null, beforeLabel: "Before", afterLabel: "Now", ridesPerWeekBefore: 0, ridesPerWeekAfter: 0, rideSpendBefore: 0, rideSpendAfter: 0 },
+    ridePrices: [], subway: { fare: 3, weeklyCap: 35 }, priceGaps: [], memberships: [], mealPlan: null,
+    charges: [], swaps: []
+  }, window.SwapFounder) : null;
+
+  // ---------------- you: live data (private/live.js from sync.py, or cloud.js) ----------------
+  // Every number in "You" is real: last full week, charges, history.
   // "2026-11-03T00:47" -> "Nov 3, 12:47 AM" (no raw ISO timestamps on screen).
   const synced = iso => {
     const [d, t = "00:00"] = String(iso).split("T"), [y, m, day] = d.split("-").map(Number), [h, min] = t.split(":").map(Number);
     const mon = new Date(y, m - 1, day).toLocaleDateString("en-US", { month: "short", day: "numeric" });
     return `${mon}, ${h % 12 || 12}:${String(min).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
   };
-  if (L) {
+  if (you) {
     Object.assign(you, {
       label: "You", blurb: "Your bank, synced " + synced(L.generatedAt), syncedAt: L.generatedAt,
       rideAppName: L.rideAppName || null,
@@ -349,22 +288,12 @@
   deriveSample(mealplan);
   deriveSample(social);
 
-  // Real profile: check the written numbers instead of overwriting them (skipped when live data is loaded).
-  if (!you.live) (function check(p) {
-    const u = usualOf(p.weekly), w = weekOf(p), t = p.thisWeek;
-    const bad = [];
-    if (u.food !== p.usual.food || u.move !== p.usual.move || u.total !== p.usual.total) bad.push("usual " + JSON.stringify(u));
-    if (w.food !== t.food || w.move !== t.move || w.total !== t.total) bad.push("thisWeek " + JSON.stringify(w));
-    if (t.cap !== p.usual.total - t.saveTarget - t.payback.perWeek) bad.push("cap");
-    if (bad.length) console.warn("[swap] data drift in profile 'you':", bad.join("; "));
-  })(you);
-
-  const profiles = { you, mealplan, social };
+  const profiles = Object.assign(you ? { you } : {}, { mealplan, social });
   Object.values(profiles).forEach(p => {
     Object.keys(shared).forEach(k => { if (p[k] === undefined) p[k] = shared[k]; });
   });
 
-  window.SwapData = Object.assign({}, shared, { profiles, order: ["you", "mealplan", "social"], active: "you" });
+  window.SwapData = Object.assign({}, shared, { profiles, order: Object.keys(profiles), active: you ? "you" : "social" });
   // Legacy top-level fields (SwapData.charges, SwapData.usual, ...) read the active profile.
   ["label", "short", "source", "blurb", "real", "facts", "usual", "thisWeek", "weekly", "move", "ridePrices", "subway", "priceGaps", "memberships", "mealPlan", "charges", "swaps"]
     .forEach(k => Object.defineProperty(window.SwapData, k, { get() { return profiles[this.active][k]; }, enumerable: true }));
